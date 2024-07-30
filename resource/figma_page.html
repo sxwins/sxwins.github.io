@@ -1,0 +1,98 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Page</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Inter, sans-serif;
+            background: white;
+            width: 640px;
+            height: 480px;
+            position: relative;
+        }
+        .header {
+            position: absolute;
+            left: 47px;
+            top: 19px;
+            color: black;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .question {
+            position: absolute;
+            left: 47px;
+            top: 72px;
+            color: black;
+            font-size: 16px;
+            font-weight: 400;
+        }
+        .option-container {
+            position: absolute;
+            left: 47px;
+            top: 115px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .option input[type="radio"] {
+            margin-right: 10px;
+        }
+        .submit-button {
+            width: 80px;
+            height: 32px;
+            position: absolute;
+            left: 84px;
+            top: 352px;
+            background: #9A19E9;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0 16px;
+            color: white;
+            font-size: 16px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">Quiz</div>
+    <div class="question">麗澤大学工学部はいつ始まりましたか?</div>
+    <form id="quizForm">
+        <div class="option-container">
+            <label class="option"><input type="radio" name="start" value="1"> 2021年4月</label>
+            <label class="option"><input type="radio" name="start" value="2"> 2022年4月</label>
+            <label class="option"><input type="radio" name="start" value="3"> 2023年4月</label>
+            <label class="option"><input type="radio" name="start" value="4"> 2024年4月</label>
+        </div>
+        <button type="button" onclick="submitQuiz()" class="submit-button">Submit</button>
+    </form>
+
+    <script>
+        function submitQuiz() {
+            const options = document.getElementsByName('start');
+            let selectedOption = -1;
+            for(let i = 0; i < options.length; i++) {
+                if(options[i].checked) {
+                    selectedOption = i + 1;
+                    break;
+                }
+            }
+            if(selectedOption === -1) {
+                alert("Please select an answer");
+            } else {
+                console.log("opinion #" + selectedOption + "selected");
+                alert("You selected opinion #" + selectedOption);
+            }
+        }
+    </script>
+</body>
+</html>

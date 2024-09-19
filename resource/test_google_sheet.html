@@ -1,0 +1,87 @@
+<html>
+  <head>
+    <title>Google Spreadsheet API Sample</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css"
+      rel="stylesheet"
+    />
+    <script src="https://accounts.google.com/gsi/client"></script>
+  </head>
+  <body>
+    <h1>
+      Google Spreadsheet 
+      APIをつかって、スプレッドシートからデータを読み込むサンプル 12345
+    </h1>
+
+    <button>認証する</button>
+
+    <ul id="list"></ul>
+
+    <script>
+      // const CLIENT_ID = "375950126163-t5eva9jg5em96l9ig6dascjh3qioju3b.apps.googleusercontent.com";
+      const CLIENT_ID = "375950126163-olht9rp4p3hqo6elisf43vr2qnbd72vq.apps.googleusercontent.com";
+      
+      const SCOPES = "https://www.googleapis.com/auth/spreadsheets.readonly";
+
+      const SPREADSHEET_ID = "1nbYBbUSOHxSqe0z8aRwh3IUontt37BBU2o8eAGoon8Y";
+
+      const fetchAndRender = async ()=>{
+        // スプレッドシートの最初のシートの名前を取得
+        const sheetName = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties.title`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            },
+          }
+        ).then((res) => res.json()).then((data) => data.sheets[0].properties.title);
+
+        // そのシートのA列の値を取得
+        const range = `${sheetName}!A:A`;
+
+        const values = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            },
+          }
+        ).then((res) => res.json()).then((data) => data.values);
+
+        // remove all list items
+        document.querySelector("#list").innerHTML = "";
+
+        values.forEach((value) => {
+          const li = document.createElement("li");
+          li.textContent = value[0];
+          document.querySelector("#list").appendChild(li);
+        });
+
+      }
+
+      const loop = async ()=>{
+        await fetchAndRender();
+        setInterval(() => {
+          fetchAndRender();
+        }, 30*1000);
+      }
+
+      const handleCredentialResponse = (response) => {
+        localStorage.setItem("access_token", response.access_token);
+
+        loop();
+      };
+
+      const authenticate = () => {
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          callback: handleCredentialResponse,
+          scope: SCOPES,
+        });
+        client.requestAccessToken();
+      };
+
+      document.querySelector("button").addEventListener("click", authenticate);
+    </script>
+  </body>
+</html>

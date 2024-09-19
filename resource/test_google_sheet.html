@@ -5,6 +5,7 @@
       href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://accounts.google.com/gsi/client"></script>
   </head>
   <body>
@@ -14,10 +15,26 @@
     </h1>
 
     <button>認証する</button>
-
+    <div id="map" style="width: 600px; height: 400px;"></div>
     <ul id="list"></ul>
 
     <script>
+
+      // Initialize the map and set its view
+      var map = L.map('map').setView([51.505, -0.09], 13);
+
+      // Add a free OpenStreetMap layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Add a marker to the map
+      var marker = L.marker([51.5, -0.09]).addTo(map);
+
+      // Bind a popup to the marker
+      marker.bindPopup("<b>Hello world!</b><br>I am a popup.").openPopup();      
+      
       // const CLIENT_ID = "375950126163-t5eva9jg5em96l9ig6dascjh3qioju3b.apps.googleusercontent.com";
       const CLIENT_ID = "375950126163-olht9rp4p3hqo6elisf43vr2qnbd72vq.apps.googleusercontent.com";
       
@@ -68,7 +85,6 @@
 
       const handleCredentialResponse = (response) => {
         localStorage.setItem("access_token", response.access_token);
-
         loop();
       };
 

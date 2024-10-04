@@ -15,7 +15,7 @@
           margin: 0;
           padding: 0;
       }
-      
+
       .custom-color-marker {
           border-radius: 50%; /* Makes the marker circular */
           display: flex; /* Displays the element as a circular */
@@ -58,7 +58,23 @@
 
       // Add a marker to the map
       // var marker = L.marker([35.83439762845149, 139.95610699230215]).addTo(map);
-      // marker.bindPopup("<b>Hello world!</b><br>I am a popup.").openPopup();      
+      // marker.bindPopup("<b>Hello world!</b><br>I am a popup.").openPopup();    
+      
+      let eventData = null;
+      fetch('event_info.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to load setting file(event_info.json): ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then(data => {
+            eventData = data;
+            console.log('json file loaded successfully:', data);   // print loaded event data
+        })
+        .catch(error => {
+            console.error('Error loading event info:', error);
+        });      
       
       // const CLIENT_ID = "375950126163-t5eva9jg5em96l9ig6dascjh3qioju3b.apps.googleusercontent.com";
       const CLIENT_ID = "375950126163-olht9rp4p3hqo6elisf43vr2qnbd72vq.apps.googleusercontent.com";
@@ -77,72 +93,133 @@
             },
           }
         ).then((res) => res.json()).then((data) => data.sheets[0].properties.title);
+        console.log('sheetName: ' + sheetName);
 
-        // そのシートのA列の値を取得
-        const range = `${sheetName}!A:A`;
+        // Query google sheet data
+        const range = `${sheetName}!A1:C100`;
+        let values;
+        try {
+          values = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+              },
+            }
+          ).then((res) => res.json()).then((data) => data.values);
+          console.log('Data loaded successfully. total', values.length, 'lines loaded.');
+          console.log('value:', values);
+        } catch (err) {
+            console.error('The API (google sheet query) returned an error: ' + err);
+        }   
 
-        const values = await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-            },
+        // Processing density data
+        latestEntry = processSheetData(values);
+
+        if (!eventData) {
+          console.log('Event data not yet loaded or failed to load');
+          return;
+        }
+        eventData.forEach(event => {
+          let densityLevel;
+          if (latestEntry[event.index]) {
+              const event_info = latestEntry[event.index];
+              if (event_info.density_level > 0)
+                  densityLevel = event_info.density_level;
+              else
+                  densityLevel = calculateDensityLevel(event_info.density)
+              
+              console.log(`Index: ${event.index}, Density Level: ${densityLevel}, Time: ${event_info.time}`);
           }
-        ).then((res) => res.json()).then((data) => data.values);
+          else {
+            densityLevel = 0;
+          }
 
-        fetch('event_info.json')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to load setting file(event_info.json): ' + response.statusText);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Data loaded successfully:', data);         // print loaded event data
-                data.forEach(event => {
-                    const densityLevel = calculateDensity(event.index); // Placeholder function
-                    const color = getColorByDensity(densityLevel);      // Placeholder function                 
-                    const marker = L.marker([event.lat, event.lon], {
-                        icon: L.divIcon({
-                            className: 'custom-color-marker', // 自定义 CSS 类
-                            html: `<span style="background-color: ${color}; width: 20px; height: 20px; display: flex; border-radius: 50%; align-items: center; justify-content: center;">12</span>`
-                        })
-                    }).addTo(map);
-                    const popupContent = `
-                        <div>
-                            <b>${event.title}</b>
-                            <br>Density: ${densityLevel}
-                            <br>Wait time: 5m
-                            <br><a href="https://www.reitaku-u.ac.jp/" target="_blank">More info</a>
-                        </div>
-                    `;
-                    const popup = L.popup().setContent(popupContent);                    
-                    //marker.bindPopup(`${event.title}<br>Density: ${densityLevel}<br>Wait time: 5m`);
-                    marker.bindPopup(popup);
-                });
-            }); 
+          const color = getColorByDensity(densityLevel);      // Placeholder function                 
+          const marker = L.marker([event.lat, event.lon], {
+              icon: L.divIcon({
+                  className: 'custom-color-marker', 
+                  html: `<span style="background-color: ${color}; width: 20px; height: 20px; display: flex; border-radius: 50%; align-items: center; justify-content: center;">12</span>`
+              })
+          }).addTo(map);
+          const popupContent = `
+              <div>
+                  <b>${event.title}</b>
+                  <br>Density: ${densityLevel}
+                  <br>Wait time: 5m
+                  <br><a href="https://www.reitaku-u.ac.jp/" target="_blank">More info</a>
+              </div>
+          `;
+          const popup = L.popup().setContent(popupContent);                    
+          //marker.bindPopup(`${event.title}<br>Density: ${densityLevel}<br>Wait time: 5m`);
+          marker.bindPopup(popup);
+        });         
+        
+        document.querySelector("#list").innerHTML = "";       // remove all list items
+        values.forEach(row => {
+            const li = document.createElement('li');
+            li.textContent = `${row[0] || ''}, ${row[1] || ''}, ${row[2] || ''}`;
+            document.querySelector("#list").appendChild(li);
+        });    
             
-        function calculateDensity(index) {
-            // Placeholder function for calculating density
-            // return Math.floor(Math.random() * 5) + 1; // Random density level between 1 and 5
-            return Math.floor(Math.random() * 6); // Random density level between 1 and 5
+        function calculateDensityLevel(density) {
+          // return Math.floor(Math.random() * 5) + 1; // Random density level between 1 and 5
+          // return Math.floor(Math.random() * 6); // Random density level between 1 and 5
+          return Math.floor(density);
         }
 
         function getColorByDensity(density) {
-            // color for density level 1-5
-            const colors = ['#d0ffff', '#0080ff', '#d0ff28', '#fdae61', '#d7191c']; 
-            return colors[density - 1] || '#202020';          // Default to black if no density is found
+          // color for density level 1-5
+          const colors = ['#d0ffff', '#0080ff', '#d0ff28', '#fdae61', '#d7191c']; 
+          return colors[density - 1] || '#202020';          // Default to black if no density is found
         } 
+        
+        function processSheetData(values) {
+            let entries = {};
 
-        // remove all list items
-        document.querySelector("#list").innerHTML = "";
+            values.forEach(row => {
+                try {
+                    if (row.length < 3 || !row[1] || isNaN(parseInt(row[0]))) return;
 
-        values.forEach((value) => {
-          const li = document.createElement("li");
-          li.textContent = value[0];
-          document.querySelector("#list").appendChild(li);
-        });
+                    const index = parseInt(row[0]);
+                    const time = row[1];
+                    const data = row[2];
 
+                    if (index > 0) {
+                        if (isNaN(parseFloat(data))) return;
+                        const entry = {
+                            index: index,
+                            time: time,
+                            density: parseFloat(data),
+                            density_level: -1,
+                            wait_time: -1
+                        };
+
+                        if (!entries[index] || time > entries[index].time) {
+                            entries[index] = entry;
+                        }
+                    } else if (index === 0) {
+                        const jsonData = JSON.parse(data);
+                        if (jsonData.index && !isNaN(jsonData.density_level)) {
+                            const entry = {
+                                index: jsonData.index,
+                                time: time,
+                                density: -1,
+                                density_level: jsonData.density_level,
+                                wait_time: jsonData.wait_time
+                            };
+
+                            if (!entries[jsonData.index] || time > entries[jsonData.index].time) {
+                                entries[jsonData.index] = entry;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error("Warning at processing data row:", error, '. data = ', row);
+                }
+            });
+            return entries; 
+        }
       }
 
       const loop = async ()=>{

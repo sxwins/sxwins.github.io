@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
   <head>
     <title>Google Spreadsheet API Sample</title>
@@ -7,11 +8,36 @@
     />
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://accounts.google.com/gsi/client"></script>
+    <style>
+      #map {
+          width: 100%;
+          height: 75%;  
+          margin: 0;
+          padding: 0;
+      }
+      
+      .custom-color-marker {
+          border-radius: 50%; /* Makes the marker circular */
+          display: flex; /* Displays the element as a circular */
+          border: 1px solid #b7b7b7; /* White border around the marker */
+          box-shadow: 0 0 2px #333; /* Shadow for visual depth */
+          align-items: center;
+          justify-content: center;
+          background-color: #2da0fd;
+          color: white;
+          font-size: 10px; /* Text font size */
+          font-weight: bold; /* Bold text */
+          flex-shrink: 0; /* Prevent the marker from shrinking */
+          min-width: 22px;
+          min-height: 22px;          
+      }
+  </style>
+
   </head>
   <body>
     <h1>
       Google Spreadsheet 
-      APIをつかって、スプレッドシートからデータを読み込むサンプル 12345
+      APIをつかって、スプレッドシートからデータを読み込むサンプル
     </h1>
 
     <button>認証する</button>
@@ -22,7 +48,7 @@
     <script>
 
       // Initialize the map and set its view
-      var map = L.map('map').setView([51.505, -0.09], 13);
+      var map = L.map('map').setView([35.83439762845149, 139.95610699230215], 16);
 
       // Add a free OpenStreetMap layer
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -31,10 +57,8 @@
       }).addTo(map);
 
       // Add a marker to the map
-      var marker = L.marker([51.5, -0.09]).addTo(map);
-
-      // Bind a popup to the marker
-      marker.bindPopup("<b>Hello world!</b><br>I am a popup.").openPopup();      
+      // var marker = L.marker([35.83439762845149, 139.95610699230215]).addTo(map);
+      // marker.bindPopup("<b>Hello world!</b><br>I am a popup.").openPopup();      
       
       // const CLIENT_ID = "375950126163-t5eva9jg5em96l9ig6dascjh3qioju3b.apps.googleusercontent.com";
       const CLIENT_ID = "375950126163-olht9rp4p3hqo6elisf43vr2qnbd72vq.apps.googleusercontent.com";
@@ -65,6 +89,50 @@
             },
           }
         ).then((res) => res.json()).then((data) => data.values);
+
+        fetch('event_info.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to load setting file(event_info.json): ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Data loaded successfully:', data);         // print loaded event data
+                data.forEach(event => {
+                    const densityLevel = calculateDensity(event.index); // Placeholder function
+                    const color = getColorByDensity(densityLevel);      // Placeholder function                 
+                    const marker = L.marker([event.lat, event.lon], {
+                        icon: L.divIcon({
+                            className: 'custom-color-marker', // 自定义 CSS 类
+                            html: `<span style="background-color: ${color}; width: 20px; height: 20px; display: flex; border-radius: 50%; align-items: center; justify-content: center;">12</span>`
+                        })
+                    }).addTo(map);
+                    const popupContent = `
+                        <div>
+                            <b>${event.title}</b>
+                            <br>Density: ${densityLevel}
+                            <br>Wait time: 5m
+                            <br><a href="https://www.reitaku-u.ac.jp/" target="_blank">More info</a>
+                        </div>
+                    `;
+                    const popup = L.popup().setContent(popupContent);                    
+                    //marker.bindPopup(`${event.title}<br>Density: ${densityLevel}<br>Wait time: 5m`);
+                    marker.bindPopup(popup);
+                });
+            }); 
+            
+        function calculateDensity(index) {
+            // Placeholder function for calculating density
+            // return Math.floor(Math.random() * 5) + 1; // Random density level between 1 and 5
+            return Math.floor(Math.random() * 6); // Random density level between 1 and 5
+        }
+
+        function getColorByDensity(density) {
+            // color for density level 1-5
+            const colors = ['#d0ffff', '#0080ff', '#d0ff28', '#fdae61', '#d7191c']; 
+            return colors[density - 1] || '#202020';          // Default to black if no density is found
+        } 
 
         // remove all list items
         document.querySelector("#list").innerHTML = "";

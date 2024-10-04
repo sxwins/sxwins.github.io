@@ -42,7 +42,8 @@
 
     <button>認証する</button>
     <div id="map" style="width: 600px; height: 400px;"></div>
-    <ul id="list"></ul>
+    <ul id="list_event"></ul>
+    <ul id="list_data"></ul>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
@@ -124,12 +125,8 @@
           let densityLevel;
           if (latestEntry[event.index]) {
               const event_info = latestEntry[event.index];
-              if (event_info.density_level > 0)
-                  densityLevel = event_info.density_level;
-              else
-                  densityLevel = calculateDensityLevel(event_info.density)
-              
-              console.log(`Index: ${event.index}, Density Level: ${densityLevel}, Time: ${event_info.time}`);
+              densityLevel = event_info.density_level;             
+              console.log(`Index: ${event.index}, Density Level: ${densityLevel}, Updated time: ${event_info.time}`);
           }
           else {
             densityLevel = 0;
@@ -153,13 +150,15 @@
           const popup = L.popup().setContent(popupContent);                    
           //marker.bindPopup(`${event.title}<br>Density: ${densityLevel}<br>Wait time: 5m`);
           marker.bindPopup(popup);
-        });         
+        });    
         
-        document.querySelector("#list").innerHTML = "";       // remove all list items
+        renderListEvent(eventData, latestEntry);        
+        
+        document.querySelector("#list_data").innerHTML = "";       // remove all list items
         values.forEach(row => {
             const li = document.createElement('li');
             li.textContent = `${row[0] || ''}, ${row[1] || ''}, ${row[2] || ''}`;
-            document.querySelector("#list").appendChild(li);
+            document.querySelector("#list_data").appendChild(li);
         });    
             
         function calculateDensityLevel(density) {
@@ -196,7 +195,8 @@
                         };
 
                         if (!entries[index] || time > entries[index].time) {
-                            entries[index] = entry;
+                            entry.density_level = calculateDensityLevel(entry.density);
+                            entries[index] = entry;                          
                         }
                     } else if (index === 0) {
                         const jsonData = JSON.parse(data);
@@ -219,6 +219,40 @@
                 }
             });
             return entries; 
+        }
+
+        function renderListEvent(events, latestEntry) {
+            const listContainer = document.getElementById('list_event');
+            listContainer.innerHTML = '';  // 清空现有的列表内容
+
+            events.forEach(event => {
+                const listItem = document.createElement('li');
+
+                let densityLevel;
+                let waitTime;
+                densityLevel = 0;
+                waitTime = "?"
+                if (latestEntry[event.index]) {
+                    const event_info = latestEntry[event.index];
+                    densityLevel = event_info.density_level; 
+                    if (event_info.wait_time > 0)
+                        waitTime = event_info.wait_time; 
+                }
+
+                listItem.innerHTML = `
+                    <div style="text-align: left;">
+                        <strong>${event.title}</strong> - Density level: ${densityLevel}, Wait time: ${waitTime}分
+                    </div>
+                    <div>
+                        <p>场所：${event.location || 'Unknown'}</p>
+                        <p>开放时间：${event.opening_hours || 'Unknown'}</p>
+                        <p>${event.description}</p>
+                    </div>
+                `;
+                listContainer.appendChild(listItem);
+            });
+
+            //document.getElementById('list_event').style.display = 'block';  // 确保列表是可见的
         }
       }
 

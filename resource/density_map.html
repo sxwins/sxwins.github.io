@@ -8,6 +8,19 @@
     />
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://accounts.google.com/gsi/client"></script>
+    <script>
+      // function toggleVisibility(event) {
+      //   // クリックされたタイトルに応じて、関連するコンテンツdivの表示状態を切り替える
+      //   const content = event.currentTarget.nextElementSibling;
+      //   content.classList.toggle('visible'); // 'visible'クラスの切り替えで表示・非表示を操作
+      // }  
+        function toggleVisibility(event) {
+            // クリックされたタイトルに応じて、関連するコンテンツdivの表示状態を切り替える
+            const content = event.currentTarget.nextElementSibling;
+            content.classList.toggle('visible');
+            content.style.display = content.classList.contains('visible') ? 'block' : 'none';
+        }      
+    </script>     
     <style>
       #map {
           width: 100%;
@@ -31,25 +44,34 @@
           min-width: 22px;
           min-height: 22px;          
       }
+
+      .content {
+          display: none;    /* コンテンツをデフォルトで隠す */
+      }
+      .content.visible {
+          display: block;   /* コンテンツを表示する */
+      }
+
   </style>
 
   </head>
   <body>
     <h1>
-      Google Spreadsheet 
-      APIをつかって、スプレッドシートからデータを読み込むサンプル(10/14)
+      2024年度 麗陵祭 混雑状況マップ
     </h1>
 
-    <button>認証する</button>
+    <button>データを取得</button>
     <div id="map" style="width: 600px; height: 400px;"></div>
     <ul id="list_event"></ul>
     <ul id="list_data"></ul>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-
+      const INIT_LOCATION = [35.833800, 139.955000];
+      const INIT_MAP_LEVEL = 17;        
+      
       // Initialize the map and set its view
-      var map = L.map('map').setView([35.83439762845149, 139.95610699230215], 16);
+      var map = L.map('map').setView(INIT_LOCATION, INIT_MAP_LEVEL);
 
       // Add a free OpenStreetMap layer
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -137,33 +159,43 @@
           return;
         }
         eventData.forEach(event => {
-          let densityLevel;
+          let densityLevel = 0;
+          let waitTime = "";
+
           if (latestEntry[event.index]) {
               const event_info = latestEntry[event.index];
-              densityLevel = event_info.density_level;             
+              densityLevel = event_info.density_level;    
+              waitTime = event_info.wait_time > 0 ? event_info.wait_time : "";         
               console.log(`Index: ${event.index}, Density Level: ${densityLevel}, Updated time: ${event_info.time}`);
-          }
-          else {
-            densityLevel = 0;
           }
 
           const color = getColorByDensity(densityLevel);      // Placeholder function                 
           const marker = L.marker([event.lat, event.lon], {
               icon: L.divIcon({
                   className: 'custom-color-marker', 
-                  html: `<span style="background-color: ${color}; width: 20px; height: 20px; display: flex; border-radius: 50%; align-items: center; justify-content: center;">12</span>`
+                  html: `<span style="background-color: ${color}; width: 20px; height: 20px; display: flex; border-radius: 50%; align-items: center; justify-content: center;">${event.index}</span>`
               })
           }).addTo(map);
+
+
+          // const popupContent = `
+          //     <div>
+          //         <b>${event.title}</b>
+          //         <br>混雑状況: ${generateCrowdIcons(densityLevel)}
+          //         <br>待ち時間: 5m
+          //         ${event.url ? `<br><a href="${event.url}" target="_blank">More info</a>` : ''}
+          //     </div>
+          // `;
           const popupContent = `
               <div>
                   <b>${event.title}</b>
-                  <br>Density: ${densityLevel}
-                  <br>Wait time: 5m
-                  <br><a href="https://www.reitaku-u.ac.jp/" target="_blank">More info</a>
+                  ${densityLevel > 0 ? `<br>混雑状況: ${generateCrowdIcons(densityLevel)}` : ''}
+                  ${waitTime ? `<br>待ち時間: ${waitTime} 分` : ''}
+                  ${event.url ? `<br><a href="${event.url}" target="_blank">More info</a>` : ''}
               </div>
-          `;
+          `;          
+
           const popup = L.popup().setContent(popupContent);                    
-          //marker.bindPopup(`${event.title}<br>Density: ${densityLevel}<br>Wait time: 5m`);
           marker.bindPopup(popup);
         });    
         
@@ -174,7 +206,8 @@
             const li = document.createElement('li');
             li.textContent = `${row[0] || ''}, ${row[1] || ''}, ${row[2] || ''}`;
             document.querySelector("#list_data").appendChild(li);
-        });    
+        }); 
+        document.querySelector("#list_data").style.display = 'none'; // hide this list
             
         function calculateDensityLevel(density) {
           // return Math.floor(Math.random() * 5) + 1; // Random density level between 1 and 5
@@ -236,38 +269,102 @@
             return entries; 
         }
 
+        function generateCrowdIcons(densityLevel) {
+            let icons = '';
+            for (let i = 1; i <= 5; i++) {
+                icons += i <= densityLevel ? '❤' : '🩶'; 
+            }
+            return icons;
+        } 
+
+        // function renderListEvent(events, latestEntry) {
+        //     const listContainer = document.getElementById('list_event');
+        //     listContainer.innerHTML = '';  // Empty current list
+
+        //     events.forEach(event => {
+        //         const listItem = document.createElement('li');
+
+        //         let densityLevel;
+        //         let waitTime;
+        //         densityLevel = 0;
+        //         waitTime = ""
+        //         if (latestEntry[event.index]) {
+        //             const event_info = latestEntry[event.index];
+        //             densityLevel = event_info.density_level; 
+        //             if (event_info.wait_time > 0)
+        //                 waitTime = event_info.wait_time; 
+        //         }
+
+        //         listItem.innerHTML = `
+        //             <div style="text-align: left; cursor: pointer;" onclick="toggleVisibility(event)">
+        //               <strong>${event.title}</strong> ${densityLevel > 0 ? `- 混雑状況: ${generateCrowdIcons(densityLevel)}` : ''}　${waitTime ? `待ち時間: ${waitTime}分` : ''}
+        //             </div>
+        //             <div class="content">
+        //                 <p>場　　所：${event.location || 'Unknown'}</p>
+        //                 <p>営業時間：${event.opening_hours || 'Unknown'}</p>
+        //                 <p>概　　要：${event.description}</p>
+        //             </div>
+        //         `;
+        //         listContainer.appendChild(listItem);
+        //     });
+
+        //     //document.getElementById('list_event').style.display = 'block';  //Ensure list is visible
+        // }
+
         function renderListEvent(events, latestEntry) {
             const listContainer = document.getElementById('list_event');
-            listContainer.innerHTML = '';  // Empty current list
 
             events.forEach(event => {
-                const listItem = document.createElement('li');
+                let listItem = document.getElementById('event-' + event.index);
 
-                let densityLevel;
-                let waitTime;
-                densityLevel = 0;
-                waitTime = "?"
-                if (latestEntry[event.index]) {
-                    const event_info = latestEntry[event.index];
-                    densityLevel = event_info.density_level; 
-                    if (event_info.wait_time > 0)
-                        waitTime = event_info.wait_time; 
+                if (!listItem) {
+                    listItem = document.createElement('li');
+                    listItem.id = 'event-' + event.index;
+                    listItem.innerHTML = `
+                        <div style="text-align: left; cursor: pointer;" onclick="toggleVisibility(event)">
+                            <strong>${event.title}</strong>
+                        </div>
+                        <div class="content">
+                            <p>場　　所：</p>
+                            <p>営業時間：</p>
+                            <p>概　　要：</p>
+                        </div>
+                    `;
+                    listContainer.appendChild(listItem);
                 }
 
-                listItem.innerHTML = `
-                    <div style="text-align: left;">
-                        <strong>${event.title}</strong> - Density level: ${densityLevel}, Wait time: ${waitTime}分
-                    </div>
-                    <div>
-                        <p>場所：${event.location || 'Unknown'}</p>
-                        <p>営業時間：${event.opening_hours || 'Unknown'}</p>
-                        <p>${event.description}</p>
-                    </div>
-                `;
-                listContainer.appendChild(listItem);
-            });
+                const infoDiv = listItem.querySelector('div:first-child');
+                const contentDiv = listItem.querySelector('.content');
 
-            //document.getElementById('list_event').style.display = 'block';  //Ensure list is visible
+                let densityLevel = 0;
+                let waitTime = "";
+                if (latestEntry[event.index]) {
+                    const event_info = latestEntry[event.index];
+                    densityLevel = event_info.density_level;
+                    waitTime = event_info.wait_time > 0 ? event_info.wait_time : "";
+                }
+
+                infoDiv.innerHTML = `
+                    <strong>${event.title}</strong>
+                    ${densityLevel > 0 ? ` - 混雑状況: ${generateCrowdIcons(densityLevel)}` : ''}
+                    ${waitTime ? ` 待ち時間: ${waitTime} 分` : ''}
+                `;
+                
+                // 更新内容部分
+                const placeP = contentDiv.querySelectorAll('p')[0];
+                placeP.textContent = `場　　所：${event.location || '不明'}`;
+                const hoursP = contentDiv.querySelectorAll('p')[1];
+                hoursP.textContent = `営業時間：${event.opening_hours || '不明'}`;
+                const descP = contentDiv.querySelectorAll('p')[2];
+                descP.textContent = `概　　要：${event.description}`;
+
+                // 折り畳み状態の同期を保持
+                if (contentDiv.style.display === 'block') {
+                    contentDiv.classList.add('visible');
+                } else {
+                    contentDiv.classList.remove('visible');
+                }
+            });
         }
       }
 
@@ -290,6 +387,8 @@
         //   scope: SCOPES,
         // });
         // client.requestAccessToken();
+
+        map.setView(INIT_LOCATION, INIT_MAP_LEVEL);
         loop();
       };
 

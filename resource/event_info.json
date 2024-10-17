@@ -46,5 +46,13 @@
         "title": "event6",
         "description": "description6",
 		"url": ""		
-    }
+    },
+    {
+        "index": 7,
+        "lat": 35.834,
+        "lon": 139.9560,
+        "title": "event7",
+        "description": "description6",
+		"url": ""		
+    }	
 ]

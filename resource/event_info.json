@@ -3,7 +3,9 @@
         "index": 1,
         "lat": 35.8335,
         "lon": 139.9547,
-        "title": "校舎かえでの隣の芝生エリア",
+        "title": "event1",
+        "location": "校舎かえでの隣の芝生エリア",
+        "opening_hours": "11/02 10:00-12:00",		
         "description": "出店3－18エリア",
 		"url": "https://sites.google.com/reitaku.jp/reiryosai2023"
     },
@@ -12,6 +14,8 @@
         "lat": 35.8338,
         "lon": 139.9548,
         "title": "event-demo2",
+        "location": "校舎かえで",
+        "opening_hours": "11/02 10:00-12:00",	
         "description": "description2",
 		"url": ""		
     },
@@ -20,6 +24,8 @@
         "lat": 35.83418,
         "lon": 139.95602,
         "title": "event3",
+        "location": "校舎かえで",
+        "opening_hours": "11/02 13:00-14:00",	
         "description": "description3",
 		"url": ""		
     },
@@ -28,6 +34,8 @@
         "lat": 35.834291,
         "lon": 139.956000,
         "title": "さつき",
+        "location": "校舎さつき",
+        "opening_hours": "11/03 10:00-12:00",	
         "description": "",
 		"url": ""		
     },
@@ -36,6 +44,8 @@
         "lat": 35.8338,
         "lon": 139.9564,
         "title": "ひいらぎ",
+        "location": "校舎さつき",
+        "opening_hours": "11/03 15:00-16:00",	
         "description": "description5",
 		"url": ""		
     },
@@ -44,6 +54,8 @@
         "lat": 35.834,
         "lon": 139.9562,
         "title": "かえで",
+        "location": "校舎さつき",
+        "opening_hours": "11/03 16:00-17:00",	
         "description": "description6",
 		"url": ""		
     },
@@ -52,6 +64,8 @@
         "lat": 35.834,
         "lon": 139.9560,
         "title": "あすなろ",
+        "location": "校舎さつき",
+        "opening_hours": "11/03 17:00-18:00",	
         "description": "description6",
 		"url": ""		
     }	

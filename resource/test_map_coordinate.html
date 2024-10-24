@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マップインタラクション</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 400px;
+        }
+        /* マップ上でのカーソルを十字線に設定 */
+        #map {
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        const INIT_LOCATION = [35.833800, 139.955000];  // 初期位置
+        const INIT_MAP_LEVEL = 17;  // 初期ズームレベル
+
+        // マップを初期化し、ビューを設定
+        var map = L.map('map').setView(INIT_LOCATION, INIT_MAP_LEVEL);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'  // OpenStreetMapの貢献者に対する帰属
+        }).addTo(map);
+
+        // クリックイベントリスナーを追加
+        map.on('click', function(e) {
+            // コンソールに出力
+            console.log(`緯度: ${e.latlng.lat}, 経度: ${e.latlng.lng}`);
+        });
+    </script>
+</body>
+</html>

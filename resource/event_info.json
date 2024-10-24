@@ -27,15 +27,15 @@
         "index": 4,
         "lat": 35.834291,
         "lon": 139.956000,
-        "title": "中華の店「たこちゅう」",
-        "description": "スイーツたこ焼きと油淋鶏を提供します",
+        "title": "さつき",
+        "description": "",
 		"url": ""		
     },
     {
         "index": 5,
         "lat": 35.8338,
         "lon": 139.9564,
-        "title": "satuki",
+        "title": "ひいらぎ",
         "description": "description5",
 		"url": ""		
     },
@@ -43,7 +43,7 @@
         "index": 6,
         "lat": 35.834,
         "lon": 139.9562,
-        "title": "event6",
+        "title": "かえで",
         "description": "description6",
 		"url": ""		
     },
@@ -51,7 +51,7 @@
         "index": 7,
         "lat": 35.834,
         "lon": 139.9560,
-        "title": "event7",
+        "title": "あすなろ",
         "description": "description6",
 		"url": ""		
     }	

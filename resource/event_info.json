@@ -7,7 +7,8 @@
         "location": "校舎かえでの隣の芝生エリア",
         "opening_hours": "11/02 10:00-12:00",		
         "description": "出店3－18エリア",
-		"url": "https://sites.google.com/reitaku.jp/reiryosai2023"
+        "density_level_setting": [5, 10, 20, 40],
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"
     },
     {
         "index": 2,
@@ -17,7 +18,8 @@
         "location": "校舎かえで",
         "opening_hours": "11/02 10:00-12:00",	
         "description": "description2",
-		"url": ""		
+        "density_level_setting": [5, 10, 20, 40],
+        "url": ""		
     },
     {
         "index": 3,
@@ -27,7 +29,8 @@
         "location": "校舎かえで",
         "opening_hours": "11/02 13:00-14:00",	
         "description": "description3",
-		"url": ""		
+        "density_level_setting": [5, 10, 20, 40],
+        "url": ""		
     },
     {
         "index": 4,
@@ -37,7 +40,7 @@
         "location": "校舎さつき",
         "opening_hours": "11/03 10:00-12:00",	
         "description": "",
-		"url": ""		
+        "url": ""		
     },
     {
         "index": 5,
@@ -47,7 +50,7 @@
         "location": "校舎さつき",
         "opening_hours": "11/03 15:00-16:00",	
         "description": "description5",
-		"url": ""		
+        "url": ""		
     },
     {
         "index": 6,
@@ -57,7 +60,7 @@
         "location": "校舎さつき",
         "opening_hours": "11/03 16:00-17:00",	
         "description": "description6",
-		"url": ""		
+        "url": ""		
     },
     {
         "index": 7,
@@ -67,6 +70,6 @@
         "location": "校舎さつき",
         "opening_hours": "11/03 17:00-18:00",	
         "description": "description6",
-		"url": ""		
+        "url": ""		
     }	
 ]

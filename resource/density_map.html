@@ -164,9 +164,15 @@
 
           if (latestEntry[event.index]) {
               const event_info = latestEntry[event.index];
+
+              if ((event_info.density >= 0) && (event_info.density_level < 0)) {
+                let densityLevelSetting = event.density_level_setting ? event.density_level_setting : [];
+                event_info.density_level = calculateDensityLevel(event_info.density, densityLevelSetting);
+              } 
+
               densityLevel = event_info.density_level;    
               waitTime = event_info.wait_time > 0 ? event_info.wait_time : "";         
-              console.log(`Index: ${event.index}, Density Level: ${densityLevel}, Updated time: ${event_info.time}`);
+              console.log(`Index: ${event.index}, Density: ${event_info.density}, Density Level: ${densityLevel}, Updated time: ${event_info.time}`);
           }
 
           const color = getColorByDensity(densityLevel);      // Placeholder function                 
@@ -209,10 +215,27 @@
         }); 
         document.querySelector("#list_data").style.display = 'none'; // hide this list
             
-        function calculateDensityLevel(density) {
-          // return Math.floor(Math.random() * 5) + 1; // Random density level between 1 and 5
-          // return Math.floor(Math.random() * 6); // Random density level between 1 and 5
-          return Math.floor(density);
+        // density level: [1, 2, 3, 4, 5]
+        function calculateDensityLevel(density, densityLevelSetting) {
+
+          const MAX_DENSITY_LEVEL = 5;
+
+          // densityLevelSettingが空または長さが0の場合、密度ごとにレベルを分ける
+          if (!densityLevelSetting || densityLevelSetting.length === 0) {            
+              return Math.max(1, Math.min(Math.floor(density / 3), MAX_DENSITY_LEVEL));
+          } else if (densityLevelSetting.length === (MAX_DENSITY_LEVEL - 1)) {
+              // 配列の長さが4の場合、特定のロジックを適用する
+              for (let i = 0; i < densityLevelSetting.length; i++) {
+                  if (density < densityLevelSetting[i]) {
+                      return i + 1; // 密度が現在の閾値未満の場合、対応するレベルを返す
+                  }
+              }
+              return densityLevelSetting.length + 1; // 最後の閾値以上の場合
+          } else {
+              // 配列の長さが4ではない場合、エラーを報告する
+              console.error('Invalid density level setting: Expected length 4, got ' + densityLevelSetting.length);
+              return 1; // エラーコードまたは別の適切なデフォルト値を返す
+          }
         }
 
         function getColorByDensity(density) {
@@ -243,8 +266,8 @@
                         };
 
                         if (!entries[index] || time > entries[index].time) {
-                            entry.density_level = calculateDensityLevel(entry.density);
-                            entries[index] = entry;                          
+                            entry.density_level = -1;
+                            entries[index] = entry;
                         }
                     } else if (index === 0) {
                         const jsonData = JSON.parse(data);

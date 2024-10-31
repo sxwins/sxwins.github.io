@@ -60,7 +60,7 @@
       2024年度 麗陵祭 混雑状況マップ
     </h1>
 
-    <button>データを取得</button>
+    <button id="btn_fetch_data">データを取得</button>
     <div id="map" style="width: 600px; height: 400px;"></div>
     <ul id="list_event"></ul>
     <ul id="list_data"></ul>
@@ -68,7 +68,30 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
       const INIT_LOCATION = [35.833800, 139.955000];
-      const INIT_MAP_LEVEL = 17;        
+      const INIT_MAP_LEVEL = 17; 
+      const MAX_MAP_LEVEL = 19;   
+      
+      
+      document.addEventListener("DOMContentLoaded", function() {
+        
+          // Parse URL to get lat/lon parameters
+          const urlParams = new URLSearchParams(window.location.search);
+          const coords = urlParams.get('coords');
+
+          if (coords) {
+
+            const [latitude, longitude] = coords.split(',');
+            if (latitude && longitude) {              
+              console.log("coords param = ", latitude, longitude);
+              const fetchDataButton = document.getElementById('btn_fetch_data');
+              if (fetchDataButton) {
+                  fetchDataButton.click(); 
+              }
+
+              map.setView([parseFloat(latitude), parseFloat(longitude)], MAX_MAP_LEVEL);  
+            }
+          }
+      });      
       
       // Initialize the map and set its view
       var map = L.map('map').setView(INIT_LOCATION, INIT_MAP_LEVEL);

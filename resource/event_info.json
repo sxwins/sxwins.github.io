@@ -34,8 +34,8 @@
     },
     {
         "index": 4,
-        "lat": 35.834291,
-        "lon": 139.956000,
+        "lat": 35.8331569,
+        "lon": 139.95497,
         "title": "さつき",
         "location": "校舎さつき",
         "opening_hours": "11/03 10:00-12:00",	
@@ -47,7 +47,7 @@
         "lat": 35.8338,
         "lon": 139.9564,
         "title": "ひいらぎ",
-        "location": "校舎さつき",
+        "location": "学生食堂会館ひいらぎ",
         "opening_hours": "11/03 15:00-16:00",	
         "description": "description5",
         "url": ""		
@@ -57,7 +57,7 @@
         "lat": 35.834,
         "lon": 139.9562,
         "title": "かえで",
-        "location": "校舎さつき",
+        "location": "校舎かえで",
         "opening_hours": "11/03 16:00-17:00",	
         "description": "description6",
         "url": ""		
@@ -67,7 +67,7 @@
         "lat": 35.834,
         "lon": 139.9560,
         "title": "あすなろ",
-        "location": "校舎さつき",
+        "location": "校舎あすなろ",
         "opening_hours": "11/03 17:00-18:00",	
         "description": "description6",
         "url": ""		

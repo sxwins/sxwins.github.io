@@ -76,15 +76,4 @@
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
     }	
-      {
-        "index": 8,
-        "lat": 35.834,
-        "lon": 139.9560,
-        "title": "メインステージ",
-        "location": "メインステージ",
-        "opening_hours": "11/03 17:00-18:00",	
-        "description": "description6",
-        "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
-    }	
 ]

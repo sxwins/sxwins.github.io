@@ -86,7 +86,7 @@
         "description": "description6",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
-    }
+    },
       {
         "index": 9,
         "lat": 35.8333,
@@ -97,5 +97,5 @@
         "description": "description6",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
-    },
+    }
 ]

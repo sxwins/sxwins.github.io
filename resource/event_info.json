@@ -93,7 +93,7 @@
         "lon": 139.9558,
         "title": "プラザホール",
         "location": "プラザホール",
-        "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
+        "opening_hours":  "11/02 10:00-17:30",	
         "description": "description6",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		

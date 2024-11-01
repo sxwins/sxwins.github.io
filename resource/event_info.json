@@ -6,7 +6,7 @@
         "title": "ライブカメラ1",
         "location": "校舎かえでの隣の芝生エリア",
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],			
-        "description": "出店3－18エリア",
+        "description": "",
         "density_level_setting": [5, 10, 20, 40],
         "url": "https://sites.google.com/reitaku.jp/reiryosai2023"
     },
@@ -39,7 +39,7 @@
         "title": "校舎さつき",
         "location": "校舎さつき",
         "opening_hours": ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
-        "description": "",
+        "description": "Istudio,Iarena等に展示あります。",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
     },
@@ -50,7 +50,7 @@
         "title": "学生食堂ひいらぎ",
         "location": "学生食堂ひいらぎ",
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
-        "description": "description5",
+        "description": "雨天時にメインステージでのイベントがひいらぎにて行われます。",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
     },
@@ -61,7 +61,7 @@
         "title": "校舎かえで",
         "location": "校舎かえで",
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
-        "description": "description6",
+        "description": "かえで教室等に展示あります。",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
     },
@@ -72,7 +72,7 @@
         "title": "校舎あすなろ",
         "location": "校舎あすなろ",
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
-        "description": "description6",
+        "description": "イベント、展示ともにあります。",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
     },	
@@ -83,7 +83,7 @@
         "title": "メインステージ",
         "location": "メインステージ",
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
-        "description": "description6",
+        "description": "雨天時にメインステージでのイベントがひいらぎにて行われます。",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
     },
@@ -94,7 +94,7 @@
         "title": "プラザホール",
         "location": "プラザホール",
         "opening_hours":  "11/02 10:00-17:30",	
-        "description": "description6",
+        "description": "伝統ある英語劇グループの演劇が行われます。",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
     }

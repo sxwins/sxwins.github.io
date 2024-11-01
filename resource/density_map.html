@@ -61,6 +61,7 @@
     </h1>
 
     <button id="btn_fetch_data">データを取得</button>
+    <button id="btn_shop_map">出店マップ</button>
     <div id="map" style="width: 600px; height: 400px;"></div>
     <ul id="list_event"></ul>
     <ul id="list_data"></ul>
@@ -438,7 +439,10 @@
         loop();
       };
 
-      document.querySelector("button").addEventListener("click", authenticate);
+      document.getElementById("btn_fetch_data").addEventListener("click", authenticate);
+      document.getElementById("btn_shop_map").addEventListener("click", function() {
+        window.location.href = "http://reitaku-rcm.backdrop.jp/index.html"; 
+      });
     </script>
   </body>
 </html>

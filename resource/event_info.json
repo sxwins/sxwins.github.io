@@ -6,7 +6,7 @@
         "title": "ライブカメラ1",
         "location": "校舎かえでの隣の芝生エリア",
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],			
-        "description": "",
+        "description": "かえで側の混雑状況を提示します。",
         "density_level_setting": [5, 10, 20, 40],
         "url": "https://sites.google.com/reitaku.jp/reiryosai2023"
     },
@@ -17,9 +17,9 @@
         "title": "ライブカメラ2",
         "location": "校舎かえでの隣の芝生エリア",
         "opening_hours": ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
-        "description": "description2",
+        "description": "かえで側の混雑状況を提示します。",
         "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"		
     },
     {
         "index": 3,
@@ -28,9 +28,9 @@
         "title": "ライブカメラ3",
         "location": "校舎かえで",
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
-        "description": "description3",
+        "description": "校舎さつきの休憩所の混雑状況を提示します。",
         "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"		
     },
     {
         "index": 4,
@@ -41,7 +41,7 @@
         "opening_hours": ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
         "description": "Istudio,Iarena等に展示あります。",
         "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"		
     },
     {
         "index": 5,
@@ -52,7 +52,7 @@
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
         "description": "雨天時にメインステージでのイベントがひいらぎにて行われます。",
         "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"		
     },
     {
         "index": 6,
@@ -63,7 +63,7 @@
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
         "description": "かえで教室等に展示あります。",
         "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"		
     },
     {
         "index": 7,
@@ -74,7 +74,7 @@
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
         "description": "イベント、展示ともにあります。",
         "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"		
     },	
      {
         "index": 8,
@@ -85,7 +85,7 @@
         "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
         "description": "雨天時にメインステージでのイベントがひいらぎにて行われます。",
         "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"		
     },
       {
         "index": 9,
@@ -96,6 +96,6 @@
         "opening_hours":  "11/02 10:00-17:30",	
         "description": "伝統ある英語劇グループの演劇が行われます。",
         "density_level_setting": [5, 10, 20, 40],
-        "url": ""		
+        "url": "https://sites.google.com/reitaku.jp/reiryosai2023"		
     }
 ]

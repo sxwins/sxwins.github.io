@@ -5,7 +5,7 @@
         "lon":  139.9550,
         "title": "ライブカメラ1",
         "location": "校舎かえでの隣の芝生エリア",
-        "opening_hours": "11/02 10:00-12:00",		
+        "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],			
         "description": "出店3－18エリア",
         "density_level_setting": [5, 10, 20, 40],
         "url": "https://sites.google.com/reitaku.jp/reiryosai2023"
@@ -16,7 +16,7 @@
         "lon": 139.9555,
         "title": "ライブカメラ2",
         "location": "校舎かえでの隣の芝生エリア",
-        "opening_hours": "11/02 10:00-12:00",	
+        "opening_hours": ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
         "description": "description2",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
@@ -27,7 +27,7 @@
         "lon": 139.9560,
         "title": "ライブカメラ3",
         "location": "校舎かえで",
-        "opening_hours": "11/02 13:00-14:00",	
+        "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
         "description": "description3",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
@@ -49,7 +49,7 @@
         "lon": 139.9549,
         "title": "学生食堂ひいらぎ",
         "location": "学生食堂ひいらぎ",
-        "opening_hours": "11/03 15:00-16:00",	
+        "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
         "description": "description5",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
@@ -60,7 +60,7 @@
         "lon": 139.9549,
         "title": "校舎かえで",
         "location": "校舎かえで",
-        "opening_hours": "11/03 16:00-17:00",	
+        "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
         "description": "description6",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
@@ -71,7 +71,7 @@
         "lon": 139.9555,
         "title": "校舎あすなろ",
         "location": "校舎あすなろ",
-        "opening_hours": "11/03 17:00-18:00",	
+        "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
         "description": "description6",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		
@@ -82,7 +82,18 @@
         "lon": 139.9558,
         "title": "メインステージ",
         "location": "メインステージ",
-        "opening_hours": "11/03 17:00-18:00",	
+        "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],		
+        "description": "description6",
+        "density_level_setting": [5, 10, 20, 40],
+        "url": ""		
+    }
+      {
+        "index": 9,
+        "lat": 35.8333,
+        "lon": 139.9558,
+        "title": "プラザホール",
+        "location": "プラザホール",
+        "opening_hours":  ["11/02 10:00-17:30", "11/03 10:00-16:00"],	
         "description": "description6",
         "density_level_setting": [5, 10, 20, 40],
         "url": ""		

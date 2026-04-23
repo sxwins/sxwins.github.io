@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BFS 幅優先探索デモンストレーション</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .node { transition: all 0.3s ease; }
+        .node-circle { transition: fill 0.3s ease, stroke 0.3s ease; }
+        .edge { transition: stroke 0.3s ease; stroke-width: 2; }
+        
+        /* 探索待ち(Open): 薄緑 */
+        .open-node { fill: #dcfce7 !important; stroke: #22c55e !important; }
+        /* 探索済み(Closed): 灰 */
+        .closed-node { fill: #f1f5f9 !important; stroke: #94a3b8 !important; }
+        /* 現在(Current): 黄 (前回の配色スキーム) */
+        .current-node { fill: #fef08a !important; stroke: #ca8a04 !important; }
+
+        @keyframes breathe {
+            0% { stroke-width: 3; stroke-opacity: 1; }
+            50% { stroke-width: 8; stroke-opacity: 0.5; }
+            100% { stroke-width: 3; stroke-opacity: 1; }
+        }
+        .pulse { animation: breathe 1.2s infinite ease-in-out; }
+        
+        .list-badge {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 探索順番号: 常に藍底白字 */
+        .order-label {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .order-label.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-2 md:p-4 font-sans text-slate-900">
+    <div class="max-w-4xl mx-auto">
+        <!-- ヘッダー -->
+        <header class="mb-4 text-center">
+            <h1 class="text-2xl font-bold text-slate-800">幅優先探索 (BFS) の仕組み</h1>
+            <div class="mt-2 text-xs text-left bg-orange-50 border border-orange-100 p-3 rounded-lg inline-block mx-auto">
+                <p class="font-bold text-orange-800 mb-1">アルゴリズムのルール：</p>
+                <p>● <b>ルール 1：</b>新しく発見されたノードは Open List の<b>最後尾（末尾）</b>に挿入されます。</p>
+                <p>● <b>ルール 2：</b>現在処理中のノードは、完了後に Open List から Closed List へ移動します。</p>
+            </div>
+        </header>
+
+        <div class="bg-white rounded-2xl shadow-lg p-4 md:p-6 border border-slate-200">
+            <!-- リスト表示エリア -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <!-- Open List -->
+                <div>
+                    <h2 class="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                        Open List (未探索 / キュー)
+                    </h2>
+                    <div id="open-list-container" class="flex flex-wrap gap-1.5 min-h-[32px] items-center">
+                        <span class="text-slate-400 text-xs italic">(空)</span>
+                    </div>
+                </div>
+
+                <!-- Closed List -->
+                <div>
+                    <h2 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
+                        Closed List (探索済み)
+                    </h2>
+                    <div id="closed-list-container" class="flex flex-wrap gap-1.5 min-h-[32px] items-center">
+                        <span class="text-slate-400 text-xs italic">(空)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- グラフ表示エリア -->
+            <div class="relative bg-white rounded-lg border border-slate-100 mb-4">
+                <div class="absolute top-2 right-2 flex flex-col gap-1 text-[9px] font-bold text-slate-400 uppercase">
+                    <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-white border border-slate-300"></div> 未探索</div>
+                    <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-green-100 border border-green-500"></div> Open (待機中)</div>
+                    <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-yellow-300"></div> 現在 </div>
+                    <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-blue-600"></div> 探索番号 </div>
+                </div>
+
+                <svg id="tree-svg" viewBox="0 0 600 320" class="w-full h-auto max-h-[300px]">
+                    <g id="edges-layer"></g>
+                    <g id="nodes-layer"></g>
+                </svg>
+            </div>
+
+            <!-- コントロールパネル -->
+            <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-4">
+                <div class="flex-grow text-center sm:text-left">
+                    <h3 id="step-title" class="font-bold text-slate-800 text-base mb-0.5">ステップ 0: 待機中</h3>
+                    <p id="step-description" class="text-slate-500 text-xs leading-relaxed">
+                        「次へ」ボタンを押して、幅優先探索を開始してください。
+                    </p>
+                </div>
+                
+                <div class="flex gap-2 shrink-0">
+                    <button id="prev-btn" class="w-10 h-10 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <button id="reset-btn" class="px-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 transition">リセット</button>
+                    <button id="next-btn" class="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold shadow-md shadow-orange-100 transition-all active:scale-95 text-sm">
+                        次へ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const nodes = {
+            'A': { x: 300, y: 45, children: ['B', 'C'], order: 1 },
+            'B': { x: 160, y: 120, children: ['D', 'E'], order: 2 },
+            'C': { x: 440, y: 120, children: ['F', 'G', 'H'], order: 3 },
+            'D': { x: 90, y: 195, children: ['I'], order: 4 },
+            'E': { x: 230, y: 195, children: [], order: 5 },
+            'F': { x: 350, y: 195, children: [], order: 6 },
+            'G': { x: 440, y: 195, children: ['J'], order: 7 },
+            'H': { x: 530, y: 195, children: [], order: 8 },
+            'I': { x: 90, y: 270, children: [], order: 9 },
+            'J': { x: 440, y: 270, children: [], order: 10 }
+        };
+
+        const steps = [
+            { id: 0, current: null, open: ['A'], closed: [], desc: "初期状態です。Open List に開始ノード A があります。" },
+            { id: 1, current: 'A', open: ['B', 'C'], closed: ['A'], desc: "A を探索。子ノード B, C を Open List の末尾に追加します。" },
+            { id: 2, current: 'B', open: ['C', 'D', 'E'], closed: ['A', 'B'], desc: "B を探索。その子ノード D, E をリストの最後尾に追加します。次は C を処理します。" },
+            { id: 3, current: 'C', open: ['D', 'E', 'F', 'G', 'H'], closed: ['A', 'B', 'C'], desc: "C を探索。子ノード F, G, H をリストの最後尾に追加します。同じ階層を優先します。" },
+            { id: 4, current: 'D', open: ['E', 'F', 'G', 'H', 'I'], closed: ['A', 'B', 'C', 'D'], desc: "D を探索。子ノード I を最後尾に追加します。" },
+            { id: 5, current: 'E', open: ['F', 'G', 'H', 'I'], closed: ['A', 'B', 'C', 'D', 'E'], desc: "E を探索。子ノードはありません。" },
+            { id: 6, current: 'F', open: ['G', 'H', 'I'], closed: ['A', 'B', 'C', 'D', 'E', 'F'], desc: "F を探索。子ノードはありません。" },
+            { id: 7, current: 'G', open: ['H', 'I', 'J'], closed: ['A', 'B', 'C', 'D', 'E', 'F', 'G'], desc: "G を探索。子ノード J を最後尾に追加します。" },
+            { id: 8, current: 'H', open: ['I', 'J'], closed: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], desc: "H を探索。第2階層のすべてのノードの探索が完了しました。" },
+            { id: 9, current: 'I', open: ['J'], closed: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'], desc: "I を探索。第3階層の探索に移ります。" },
+            { id: 10, current: 'J', open: [], closed: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'], desc: "J を探索。Open List が空になり、すべてのノードを訪問しました。" },
+            { id: 11, current: null, open: [], closed: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'], desc: "幅優先探索が完了しました。階層ごとに探索が進んだことがわかります。" }
+        ];
+
+        let currentStepIdx = 0;
+
+        function initGraph() {
+            const nodesLayer = document.getElementById('nodes-layer');
+            const edgesLayer = document.getElementById('edges-layer');
+
+            Object.keys(nodes).forEach(parentId => {
+                const parent = nodes[parentId];
+                parent.children.forEach(childId => {
+                    const child = nodes[childId];
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("x1", parent.x); line.setAttribute("y1", parent.y);
+                    line.setAttribute("x2", child.x); line.setAttribute("y2", child.y);
+                    line.setAttribute("class", "edge stroke-slate-200");
+                    edgesLayer.appendChild(line);
+                });
+            });
+
+            Object.keys(nodes).forEach(id => {
+                const node = nodes[id];
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.setAttribute("id", `node-${id}`);
+                g.setAttribute("class", "node");
+
+                // 探索順番号 (ラベル) - 常に藍底白字
+                const labelG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                labelG.setAttribute("id", `order-${id}`);
+                labelG.setAttribute("class", "order-label");
+
+                const labelRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                labelRect.setAttribute("x", node.x - 22); labelRect.setAttribute("y", node.y - 30);
+                labelRect.setAttribute("width", "16"); labelRect.setAttribute("height", "16");
+                labelRect.setAttribute("rx", "4");
+                labelRect.setAttribute("class", "fill-blue-600 shadow-sm");
+
+                const labelText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                labelText.setAttribute("x", node.x - 14); labelText.setAttribute("y", node.y - 18);
+                labelText.setAttribute("text-anchor", "middle");
+                labelText.setAttribute("class", "text-[9px] font-black fill-white");
+                labelText.textContent = node.order;
+
+                labelG.appendChild(labelRect);
+                labelG.appendChild(labelText);
+                g.appendChild(labelG);
+
+                // ノード本体
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute("cx", node.x); circle.setAttribute("cy", node.y); circle.setAttribute("r", "15");
+                circle.setAttribute("class", "node-circle fill-white stroke-slate-300 stroke-2");
+                
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("x", node.x); text.setAttribute("y", node.y + 4);
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("class", "text-[11px] font-bold fill-slate-500");
+                text.textContent = id;
+
+                g.appendChild(circle);
+                g.appendChild(text);
+                nodesLayer.appendChild(g);
+            });
+        }
+
+        function updateUI() {
+            const step = steps[currentStepIdx];
+            document.getElementById('step-title').textContent = `ステップ ${step.id}: ${step.current ? 'ノード ' + step.current + ' を探索中' : (currentStepIdx === 0 ? '準備完了' : '完了')}`;
+            document.getElementById('step-description').textContent = step.desc;
+
+            document.getElementById('prev-btn').disabled = currentStepIdx === 0;
+            document.getElementById('next-btn').disabled = currentStepIdx === steps.length - 1;
+
+            Object.keys(nodes).forEach(id => {
+                const circle = document.querySelector(`#node-${id} circle`);
+                const text = document.querySelector(`#node-${id} text`);
+                const label = document.querySelector(`#order-${id}`);
+                
+                circle.classList.remove('open-node', 'closed-node', 'current-node', 'pulse');
+                text.classList.remove('fill-slate-800');
+                text.classList.add('fill-slate-500');
+                label.classList.remove('show');
+                
+                // 探索済または現在探索中の場合に番号を表示 (藍底白字)
+                if (step.closed.includes(id) || step.current === id) {
+                    label.classList.add('show');
+                }
+
+                if (step.current === id) {
+                    circle.classList.add('current-node', 'pulse');
+                    text.classList.replace('fill-slate-500', 'fill-slate-800');
+                } else if (step.open.includes(id)) {
+                    circle.classList.add('open-node');
+                } else if (step.closed.includes(id)) {
+                    circle.classList.add('closed-node');
+                }
+            });
+
+            renderList('open-list-container', step.open, 'bg-green-500 text-white border-green-600');
+            renderList('closed-list-container', step.closed, 'bg-slate-200 text-slate-700 border-slate-300');
+        }
+
+        function renderList(containerId, list, classes) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            if (list.length === 0) {
+                container.innerHTML = '<span class="text-slate-300 text-[10px] italic">空</span>';
+                return;
+            }
+            list.forEach((item) => {
+                const el = document.createElement('div');
+                el.className = `list-badge w-6 h-6 flex items-center justify-center rounded-md border text-[10px] font-black shadow-sm ${classes}`;
+                el.textContent = item;
+                container.appendChild(el);
+            });
+        }
+
+        document.getElementById('next-btn').addEventListener('click', () => { if(currentStepIdx < steps.length-1) { currentStepIdx++; updateUI(); }});
+        document.getElementById('prev-btn').addEventListener('click', () => { if(currentStepIdx > 0) { currentStepIdx--; updateUI(); }});
+        document.getElementById('reset-btn').addEventListener('click', () => { currentStepIdx = 0; updateUI(); });
+
+        window.onload = () => { initGraph(); updateUI(); };
+    </script>
+</body>
+</html>

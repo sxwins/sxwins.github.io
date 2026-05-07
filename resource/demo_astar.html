@@ -472,7 +472,7 @@ function updateUI() {
         } else if (openSet.has(id)) {
             gEl.classList.add('node-open');
             if (step.fMap && step.fMap[id] !== undefined) {
-                fLbl.textContent = `f&#770;=${step.fMap[id]}`;
+                fLbl.textContent = `f\u0302=${step.fMap[id]}`;
                 fLbl.setAttribute('opacity', '1');
             }
         } else if (id === 'S') {

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A* アルゴリズム デモンストレーション</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg:      #f4f6fb;
+            --surface: #ffffff;
+            --surface2:#f0f3fa;
+            --border:  #dde2ee;
+            --accent:  #0ea5e9;
+            --accent2: #d4891a;
+            --green:   #1a9e5c;
+            --teal:    #0d9488;
+            --text:    #1e2233;
+            --muted:   #6b7490;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Noto Sans JP', sans-serif;
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        h1 { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+
+        .glass {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(14,165,233,0.06);
+        }
+
+        .badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+        .badge-open {
+            background: rgba(14,165,233,0.12);
+            color: #0369a1;
+            border: 1px solid rgba(14,165,233,0.30);
+        }
+        .badge-closed {
+            background: rgba(26,158,92,0.10);
+            color: #16784a;
+            border: 1px solid rgba(26,158,92,0.28);
+        }
+
+        /* SVG ノードスタイル */
+        .node-circle { transition: fill 0.35s, stroke 0.35s, filter 0.35s; }
+        .node-default .node-circle { fill: #f0f3fa; stroke: #c5cde0; stroke-width: 2.5; }
+        .node-open    .node-circle { fill: #e0f2fe; stroke: #0ea5e9; stroke-width: 2.5;
+                                     filter: drop-shadow(0 0 5px rgba(14,165,233,0.35)); }
+        .node-current .node-circle { fill: #fef3c7; stroke: #d4891a; stroke-width: 3;
+                                     filter: drop-shadow(0 0 8px rgba(212,137,26,0.45)); }
+        .node-closed  .node-circle { fill: #d1fae5; stroke: #1a9e5c; stroke-width: 2.5; }
+        .node-start   .node-circle { fill: #bae6fd; stroke: #0ea5e9; stroke-width: 3; }
+        .node-goal    .node-circle { fill: #fce7f3; stroke: #db7ab8; stroke-width: 3; }
+
+        .node-text { fill: #1e2233; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; }
+        .node-h    { fill: #94a3b8; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+        .edge-default { stroke: #c5cde0; stroke-width: 2; }
+        .edge-cost    { fill: #6b7490; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+
+        @keyframes pulse-ring {
+            0%   { stroke-width: 3; stroke-opacity: 0.85; }
+            50%  { stroke-width: 9; stroke-opacity: 0.25; }
+            100% { stroke-width: 3; stroke-opacity: 0.85; }
+        }
+        .pulse-anim { animation: pulse-ring 1.2s infinite ease-in-out; }
+
+        .f-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+                   fill: #0369a1; transition: opacity 0.3s; }
+
+        /* ボタン */
+        .ctrl-btn {
+            display: flex; align-items: center; justify-content: center;
+            height: 40px; border-radius: 10px; font-weight: 700; cursor: pointer;
+            border: 1px solid var(--border);
+            transition: all 0.15s ease;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .ctrl-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.10); }
+        .ctrl-btn:active:not(:disabled) { transform: scale(0.97); }
+        .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn-primary   { background: var(--teal); border-color: var(--teal); color: white; padding: 0 24px; }
+        .btn-primary:hover:not(:disabled) { background: #0f766e; }
+        .btn-secondary { background: var(--surface2); color: var(--muted); width: 40px; }
+        .btn-reset     { background: transparent; color: var(--muted); padding: 0 16px; font-size: 12px; }
+
+        /* アルゴリズムボックス */
+        .algo-box {
+            background: #f5fbf7;
+            border: 1.5px solid #b6dfc8;
+            border-radius: 12px;
+            padding: 14px 18px;
+            font-size: 12px;
+            line-height: 1.85;
+        }
+        .algo-box .step-num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: #2d6a3f; color: white;
+            font-size: 10px; font-weight: 900; flex-shrink: 0;
+            margin-right: 7px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .algo-box .algo-line        { display: flex; align-items: flex-start; margin-bottom: 2px; border-radius: 6px; padding: 2px 4px; transition: background 0.25s; }
+        .algo-box .algo-line.indent { padding-left: 27px; }
+        .algo-box .kw  { color: #2563eb; font-weight: 700; }
+        .algo-box .hl  { color: #0f766e; font-weight: 700; }
+        .algo-box .algo-line.active-algo { background: #e0fdf4; }
+
+        .algo-rule {
+            background: var(--surface2);
+            border-left: 3px solid var(--teal);
+            border-radius: 0 8px 8px 0;
+            padding: 10px 14px;
+            font-size: 12px;
+            line-height: 1.75;
+        }
+
+        .formula-chip {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #f0fdf4; border: 1px solid #86efac;
+            border-radius: 8px; padding: 4px 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; color: #166534; font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+<div class="max-w-5xl mx-auto">
+
+    <!-- ヘッダー -->
+    <header class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-black text-[#1e2233]">
+                Algorithm 3.3 &nbsp;<span style="color:var(--teal)">A* アルゴリズム</span>
+            </h1>
+            <p class="text-[var(--muted)] text-xs mt-1">
+                選択基準：<b>f&#770;(s) = g&#770;(s) + h&#770;(s)</b> &nbsp;（累積コスト推定値 ＋ 予測評価値）
+            </p>
+        </div>
+        <div class="algo-rule text-[var(--text)] max-w-xs">
+            <p>● Open の先頭（<b>f&#770; 値最小</b>）を展開</p>
+            <p>● より小さい f&#770; で再発見したら<b>更新して再挿入</b></p>
+            <p>● f&#770;(s) 昇順に並び替え</p>
+        </div>
+    </header>
+
+    <!-- アルゴリズム擬似コード -->
+    <div class="algo-box mb-4">
+        <div class="algo-line" id="al1"><span class="step-num">1</span>初期状態を予測評価値とともにオープンリストに追加する．クローズドリストを空に初期化する．</div>
+        <div class="algo-line" id="al2"><span class="step-num">2</span><span class="kw">while</span>&nbsp; オープンリストが空ではない．&nbsp;<span class="kw">do</span></div>
+        <div class="algo-line indent" id="al3"><span class="step-num">3</span>オープンリストから先頭の要素 s を取り出す．クローズドリストに s を追加する（s を探査することに相当）．</div>
+        <div class="algo-line indent" id="al4"><span class="step-num">4</span>s が目標状態ならば，解は発見されたとして探索を終了．</div>
+        <div class="algo-line indent" id="al5"><span class="step-num">5</span>s から接続されているすべての状態 s' に関して累積コストの推定値 g&#770;(s') と予測評価値 h&#770;(s') から f&#770;(s') を計算する．</div>
+        <div class="algo-line indent" id="al6"><span class="step-num">6</span>⑤ の状態のうちで，オープンリストにもクローズドリストにも含まれていないものは，オープンリストに加える．</div>
+        <div class="algo-line indent" id="al7"><span class="step-num">7</span>⑤ の状態のうちで，オープンリストかクローズドリストに含まれていたものについては，すでに入っているものより f&#770;(s) の値が小さければ，<span class="hl">元のものを消去し，新しいものをオープンリストに追加する．</span></div>
+        <div class="algo-line indent" id="al8"><span class="step-num">8</span>オープンリスト内の状態を，<span class="hl">累積コストの推定値と予測評価値の和 f&#770;(s) が小さい順に並び替える．</span></div>
+        <div class="algo-line" id="al9"><span class="step-num">9</span><span class="kw">end while</span>&nbsp; 探索を終了．</div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+        <!-- グラフ -->
+        <div class="lg:col-span-3 glass p-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-[var(--muted)] uppercase tracking-widest">グラフ（図 3.2）</span>
+                <div class="flex gap-3 text-[10px] text-[var(--muted)]">
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#0ea5e9;border:1px solid #0ea5e9"></span>Open</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#d4891a] inline-block border border-[#d4891a]"></span>展開中</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#1a9e5c] inline-block border border-[#1a9e5c]"></span>Closed</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                <span class="formula-chip">f&#770; = g&#770; + h&#770;</span>
+                <span id="formula-detail" class="text-[11px] text-[var(--muted)] font-mono"></span>
+            </div>
+            <svg id="graph-svg" viewBox="0 0 520 340" class="w-full h-auto">
+                <g id="edges-layer"></g>
+                <g id="nodes-layer"></g>
+            </svg>
+        </div>
+
+        <!-- 右パネル -->
+        <div class="lg:col-span-2 flex flex-col gap-4">
+
+            <!-- Open / Closed リスト -->
+            <div class="glass p-4">
+                <div class="mb-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-2 h-2 rounded-full inline-block" style="background:#0ea5e9"></span>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-[#0369a1]">Open List</span>
+                        <span class="text-[10px] text-[var(--muted)]">（f&#770; 値昇順）</span>
+                    </div>
+                    <div id="open-list" class="flex flex-wrap gap-1.5 min-h-[30px]">
+                        <span class="text-[var(--muted)] text-xs italic">空</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-2 h-2 rounded-full bg-[var(--green)] inline-block"></span>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-[var(--green)]">Closed List</span>
+                    </div>
+                    <div id="closed-list" class="flex flex-wrap gap-1.5 min-h-[30px]">
+                        <span class="text-[var(--muted)] text-xs italic">空</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ステップ説明 + ボタン -->
+            <div class="glass p-4 flex flex-col flex-grow">
+                <div class="flex items-baseline gap-2 mb-2">
+                    <span id="step-num" class="font-mono font-black text-[var(--accent2)] text-lg">準備完了</span>
+                </div>
+                <p id="step-desc" class="text-sm text-[var(--text)] leading-relaxed flex-grow" style="white-space:pre-line">「次へ」ボタンを押して探索を開始してください。</p>
+                <div class="flex gap-2 mt-4">
+                    <button id="prev-btn" class="ctrl-btn btn-secondary" title="前へ">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <button id="reset-btn" class="ctrl-btn btn-reset">リセット</button>
+                    <button id="next-btn" class="ctrl-btn btn-primary flex-grow">次へ →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const nodes = {
+    S: { x: 75,  y: 125, h: 4 },
+    A: { x: 245, y: 45,  h: 4 },
+    B: { x: 195, y: 170, h: 2 },
+    C: { x: 365, y: 75,  h: 3 },
+    D: { x: 400, y: 175, h: 1 },
+    E: { x: 285, y: 210, h: 1 },
+    F: { x: 175, y: 285, h: 0 },
+    G: { x: 445, y: 275, h: 0 },
+};
+
+const edges = [
+    ['S','A', 2], ['S','B', 6], ['A','C', 1], ['A','B', 2],
+    ['B','E', 5], ['B','F', 4], ['C','D', 5], ['C','E', 2],
+    ['D','G', 1], ['E','D', 1], ['E','G', 5],
+];
+
+// 表 3.4 準拠：f(s) = g(s) + h(s) で昇順ソート
+const steps = [
+    {
+        stepNum: '初期化',
+        current: null,
+        openNodes:  ['S'], closedNodes:[],
+        openList:   ['S(4)'], closedList: [],
+        fMap: { S:4 }, gMap: { S:0 },
+        algoSteps: ['al1'],
+        formulaDetail: '',
+        desc: '初期状態 S を f&#770;(S) = g&#770;(0) + h&#770;(4) = 4 でオープンリストに追加します。\nクローズドリストは空に初期化されます。'
+    },
+    {
+        stepNum: 'ステップ 1',
+        current: 'S',
+        openNodes:  ['A','B'], closedNodes:['S'],
+        openList:   ['A(6)', 'B(8)'], closedList: ['S(4)'],
+        fMap: { A:6, B:8 }, gMap: { A:2, B:6 },
+        algoSteps: ['al3','al5','al6','al8'],
+        formulaDetail: 'A: g&#770;2+h&#770;4=6　B: g&#770;6+h&#770;2=8',
+        desc: '【③】S(f&#770;=4) を取り出し Closed へ移動。\n【⑤】隣接: A(f&#770;=2+4=6), B(f&#770;=6+2=8) を計算。\n【⑥】両ノードとも未登録のため Open へ追加。\n【⑧】f&#770; 昇順に並び替え。'
+    },
+    {
+        stepNum: 'ステップ 2',
+        current: 'A',
+        openNodes:  ['B','C'], closedNodes:['S','A'],
+        openList:   ['B(6)', 'C(6)'], closedList: ['S(4)', 'A(6)'],
+        fMap: { B:6, C:6 }, gMap: { B:4, C:3 },
+        algoSteps: ['al3','al5','al7','al8'],
+        formulaDetail: 'C: g&#770;3+h&#770;3=6（新規）　B: g&#770;4+h&#770;2=6（更新 8→6）',
+        desc: '【③】A(f&#770;=6) を取り出し Closed へ移動。\n【⑤】隣接: C(f&#770;=3+3=6), B(f&#770;=4+2=6) を計算。\n【⑦】B は旧 f&#770;=8 > 新 f&#770;=6 のため更新して再挿入。C は新規追加。\n【⑧】f&#770; 昇順に並び替え。'
+    },
+    {
+        stepNum: 'ステップ 3',
+        current: 'B',
+        openNodes:  ['C','F','E'], closedNodes:['S','A','B'],
+        openList:   ['C(6)', 'F(8)', 'E(10)'], closedList: ['S(4)', 'A(6)', 'B(6)'],
+        fMap: { C:6, F:8, E:10 }, gMap: { C:3, F:8, E:9 },
+        algoSteps: ['al3','al5','al6','al8'],
+        formulaDetail: 'F: g&#770;8+h&#770;0=8　E: g&#770;9+h&#770;1=10（新規）',
+        desc: '【③】B(f&#770;=6) を取り出し Closed へ移動。\n【⑤】隣接: E(f&#770;=9+1=10), F(f&#770;=8+0=8) を計算。\n【⑥】E, F とも未登録のため Open へ追加。\n【⑧】f&#770; 昇順に並び替え。'
+    },
+    {
+        stepNum: 'ステップ 4',
+        current: 'C',
+        openNodes:  ['E','F','D'], closedNodes:['S','A','B','C'],
+        openList:   ['E(6)', 'F(8)', 'D(9)'], closedList: ['S(4)', 'A(6)', 'B(6)', 'C(6)'],
+        fMap: { E:6, F:8, D:9 }, gMap: { E:5, F:8, D:8 },
+        algoSteps: ['al3','al5','al7','al8'],
+        formulaDetail: 'E: g&#770;5+h&#770;1=6（更新 10→6）　D: g&#770;8+h&#770;1=9（新規）',
+        desc: '【③】C(f&#770;=6) を取り出し Closed へ移動。\n【⑤】隣接: E(f&#770;=5+1=6), D(f&#770;=8+1=9) を計算。\n【⑦】E は旧 f&#770;=10 > 新 f&#770;=6 のため更新して再挿入。D は新規追加。\n【⑧】f&#770; 昇順に並び替え。'
+    },
+    {
+        stepNum: 'ステップ 5',
+        current: 'E',
+        openNodes:  ['D','F','G'], closedNodes:['S','A','B','C','E'],
+        openList:   ['D(7)', 'F(8)', 'G(10)'], closedList: ['S(4)', 'A(6)', 'B(6)', 'C(6)', 'E(6)'],
+        fMap: { D:7, F:8, G:10 }, gMap: { D:6, F:8, G:10 },
+        algoSteps: ['al3','al5','al7','al8'],
+        formulaDetail: 'D: g&#770;6+h&#770;1=7（更新 9→7）　G: g&#770;10+h&#770;0=10（新規）',
+        desc: '【③】E(f&#770;=6) を取り出し Closed へ移動。\n【⑤】隣接: D(f&#770;=6+1=7), G(f&#770;=10+0=10) を計算。\n【⑦】D は旧 f&#770;=9 > 新 f&#770;=7 のため更新して再挿入。G は新規追加。\n【⑧】f&#770; 昇順に並び替え。'
+    },
+    {
+        stepNum: 'ステップ 6',
+        current: 'D',
+        openNodes:  ['G','F'], closedNodes:['S','A','B','C','E','D'],
+        openList:   ['G(7)', 'F(8)'], closedList: ['S(4)', 'A(6)', 'B(6)', 'C(6)', 'E(6)', 'D(7)'],
+        fMap: { G:7, F:8 }, gMap: { G:7, F:8 },
+        algoSteps: ['al3','al5','al7','al8'],
+        formulaDetail: 'G: g&#770;7+h&#770;0=7（更新 10→7）',
+        desc: '【③】D(f&#770;=7) を取り出し Closed へ移動。\n【⑤】隣接: G(f&#770;=7+0=7) を計算。\n【⑦】G は旧 f&#770;=10 > 新 f&#770;=7 のため更新して再挿入。\n【⑧】f&#770; 昇順に並び替え。'
+    },
+    {
+        stepNum: 'ステップ 7',
+        current: 'G',
+        openNodes:  [], closedNodes:['S','A','B','C','E','D','G'],
+        openList:   [], closedList: ['S(4)', 'A(6)', 'B(6)', 'C(6)', 'E(6)', 'D(7)', 'G(7)'],
+        fMap: {}, gMap: {},
+        algoSteps: ['al4'],
+        formulaDetail: '',
+        goal: true,
+        desc: '【③】G(f&#770;=7) を取り出し Closed へ移動。\n【④】G はゴールノードです。解が発見されました！\n最適コスト g(G) = 7。探索終了。'
+    },
+];
+
+let currentIdx = 0;
+
+function svgEl(tag) {
+    return document.createElementNS('http://www.w3.org/2000/svg', tag);
+}
+
+function initGraph() {
+    const eL = document.getElementById('edges-layer');
+    const nL = document.getElementById('nodes-layer');
+
+    edges.forEach(([u, v, c]) => {
+        const nu = nodes[u], nv = nodes[v];
+        const dx = nv.x - nu.x, dy = nv.y - nu.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const r = 21;
+        const line = svgEl('line');
+        line.setAttribute('x1', nu.x + dx/len*r); line.setAttribute('y1', nu.y + dy/len*r);
+        line.setAttribute('x2', nv.x - dx/len*r); line.setAttribute('y2', nv.y - dy/len*r);
+        line.setAttribute('class', 'edge-default');
+        eL.appendChild(line);
+
+        const mx = (nu.x + nv.x) / 2, my = (nu.y + nv.y) / 2;
+        const ox = -dy/len * 11, oy = dx/len * 11;
+        const lbl = svgEl('text');
+        lbl.setAttribute('x', mx + ox); lbl.setAttribute('y', my + oy);
+        lbl.setAttribute('text-anchor', 'middle');
+        lbl.setAttribute('dominant-baseline', 'central');
+        lbl.setAttribute('class', 'edge-cost');
+        lbl.textContent = c;
+        eL.appendChild(lbl);
+    });
+
+    Object.entries(nodes).forEach(([id, n]) => {
+        const g = svgEl('g');
+        g.setAttribute('id', `node-${id}`);
+        g.setAttribute('class', id === 'S' ? 'node-start' : id === 'G' ? 'node-goal' : 'node-default');
+
+        const ring = svgEl('circle');
+        ring.setAttribute('cx', n.x); ring.setAttribute('cy', n.y); ring.setAttribute('r', 25);
+        ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', '#d4891a');
+        ring.setAttribute('stroke-width', '3'); ring.setAttribute('stroke-opacity', '0');
+        ring.setAttribute('id', `ring-${id}`);
+        g.appendChild(ring);
+
+        const circle = svgEl('circle');
+        circle.setAttribute('cx', n.x); circle.setAttribute('cy', n.y); circle.setAttribute('r', 20);
+        circle.setAttribute('class', 'node-circle');
+        g.appendChild(circle);
+
+        const txt = svgEl('text');
+        txt.setAttribute('x', n.x); txt.setAttribute('y', n.y + 5);
+        txt.setAttribute('text-anchor', 'middle');
+        txt.setAttribute('class', 'node-text');
+        txt.textContent = id;
+        g.appendChild(txt);
+
+        const hTxt = svgEl('text');
+        hTxt.setAttribute('x', n.x + 24); hTxt.setAttribute('y', n.y - 14);
+        hTxt.setAttribute('text-anchor', 'middle');
+        hTxt.setAttribute('class', 'node-h');
+        hTxt.textContent = `(${n.h})`;
+        g.appendChild(hTxt);
+
+        const fLbl = svgEl('text');
+        fLbl.setAttribute('x', n.x); fLbl.setAttribute('y', n.y + 37);
+        fLbl.setAttribute('text-anchor', 'middle');
+        fLbl.setAttribute('class', 'f-label');
+        fLbl.setAttribute('opacity', '0');
+        fLbl.setAttribute('id', `flbl-${id}`);
+        g.appendChild(fLbl);
+
+        nL.appendChild(g);
+    });
+}
+
+function updateUI() {
+    const step = steps[currentIdx];
+    document.getElementById('step-num').textContent = step.stepNum;
+    document.getElementById('step-desc').innerHTML = step.desc;
+    document.getElementById('formula-detail').innerHTML = step.formulaDetail || '';
+
+    document.getElementById('prev-btn').disabled = currentIdx === 0;
+    const nextBtn = document.getElementById('next-btn');
+    if (step.goal) {
+        nextBtn.textContent = '完了 ✓';
+        nextBtn.disabled = true;
+    } else {
+        nextBtn.textContent = '次へ →';
+        nextBtn.disabled = currentIdx === steps.length - 1;
+    }
+
+    ['al1','al2','al3','al4','al5','al6','al7','al8','al9'].forEach(id => {
+        document.getElementById(id).classList.remove('active-algo');
+    });
+    (step.algoSteps || []).forEach(id => {
+        document.getElementById(id).classList.add('active-algo');
+    });
+
+    const openSet   = new Set(step.openNodes);
+    const closedSet = new Set(step.closedNodes);
+
+    Object.keys(nodes).forEach(id => {
+        const gEl  = document.getElementById(`node-${id}`);
+        const ring = document.getElementById(`ring-${id}`);
+        const fLbl = document.getElementById(`flbl-${id}`);
+
+        gEl.classList.remove('node-default','node-open','node-current','node-closed','node-start','node-goal');
+        ring.setAttribute('stroke-opacity', '0');
+        ring.classList.remove('pulse-anim');
+        fLbl.setAttribute('opacity', '0');
+
+        if (id === step.current) {
+            gEl.classList.add('node-current');
+            ring.setAttribute('stroke-opacity', '0.85');
+            ring.classList.add('pulse-anim');
+            if (step.gMap && step.gMap[id] !== undefined) {
+                const gv = step.gMap[id], hv = nodes[id].h;
+                fLbl.textContent = `${gv}+${hv}=${gv+hv}`;
+                fLbl.setAttribute('opacity', '1');
+            }
+        } else if (closedSet.has(id)) {
+            gEl.classList.add('node-closed');
+        } else if (openSet.has(id)) {
+            gEl.classList.add('node-open');
+            if (step.fMap && step.fMap[id] !== undefined) {
+                fLbl.textContent = `f&#770;=${step.fMap[id]}`;
+                fLbl.setAttribute('opacity', '1');
+            }
+        } else if (id === 'S') {
+            gEl.classList.add('node-start');
+        } else if (id === 'G') {
+            gEl.classList.add('node-goal');
+        } else {
+            gEl.classList.add('node-default');
+        }
+    });
+
+    renderBadgeList('open-list',   step.openList,   'badge-open');
+    renderBadgeList('closed-list', step.closedList, 'badge-closed');
+}
+
+function renderBadgeList(containerId, items, cls) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    if (!items || items.length === 0) {
+        el.innerHTML = '<span style="color:var(--muted);font-size:12px;font-style:italic">空</span>';
+        return;
+    }
+    items.forEach(item => {
+        const badge = document.createElement('span');
+        badge.className = `badge ${cls}`;
+        badge.textContent = item;
+        el.appendChild(badge);
+    });
+}
+
+document.getElementById('next-btn').addEventListener('click', () => {
+    if (currentIdx < steps.length - 1) { currentIdx++; updateUI(); }
+});
+document.getElementById('prev-btn').addEventListener('click', () => {
+    if (currentIdx > 0) { currentIdx--; updateUI(); }
+});
+document.getElementById('reset-btn').addEventListener('click', () => {
+    currentIdx = 0;
+    document.getElementById('next-btn').textContent = '次へ →';
+    document.getElementById('next-btn').disabled = false;
+    updateUI();
+});
+
+window.onload = () => { initGraph(); updateUI(); };
+</script>
+</body>
+</html>

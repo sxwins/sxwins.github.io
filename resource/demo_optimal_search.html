@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最適探索 デモンストレーション</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg:      #f4f6fb;
+            --surface: #ffffff;
+            --surface2:#f0f3fa;
+            --border:  #dde2ee;
+            --accent:  #4f8ef7;
+            --accent2: #d4891a;
+            --green:   #1a9e5c;
+            --text:    #1e2233;
+            --muted:   #6b7490;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Noto Sans JP', sans-serif;
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        h1 { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+
+        .glass {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(79,142,247,0.06);
+        }
+
+        .badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+        .badge-open {
+            background: rgba(79,142,247,0.12);
+            color: #2b6fd4;
+            border: 1px solid rgba(79,142,247,0.30);
+        }
+        .badge-closed {
+            background: rgba(26,158,92,0.10);
+            color: #16784a;
+            border: 1px solid rgba(26,158,92,0.28);
+        }
+
+        /* SVG ノードスタイル */
+        .node-circle { transition: fill 0.35s, stroke 0.35s, filter 0.35s; }
+        .node-default .node-circle { fill: #f0f3fa; stroke: #c5cde0; stroke-width: 2.5; }
+        .node-open    .node-circle { fill: #dbeafe; stroke: #4f8ef7; stroke-width: 2.5;
+                                     filter: drop-shadow(0 0 5px rgba(79,142,247,0.35)); }
+        .node-current .node-circle { fill: #fef3c7; stroke: #d4891a; stroke-width: 3;
+                                     filter: drop-shadow(0 0 8px rgba(212,137,26,0.45)); }
+        .node-closed  .node-circle { fill: #d1fae5; stroke: #1a9e5c; stroke-width: 2.5; }
+        .node-start   .node-circle { fill: #bfdbfe; stroke: #4f8ef7; stroke-width: 3; }
+        .node-goal    .node-circle { fill: #fce7f3; stroke: #db7ab8; stroke-width: 3; }
+
+        .node-text { fill: #1e2233; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; }
+        .edge-default { stroke: #c5cde0; stroke-width: 2; }
+        .edge-cost    { fill: #6b7490; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+
+        @keyframes pulse-ring {
+            0%   { stroke-width: 3; stroke-opacity: 0.85; }
+            50%  { stroke-width: 9; stroke-opacity: 0.25; }
+            100% { stroke-width: 3; stroke-opacity: 0.85; }
+        }
+        .pulse-anim { animation: pulse-ring 1.2s infinite ease-in-out; }
+
+        .g-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; fill: #2b6fd4; transition: opacity 0.3s; }
+
+        /* ボタン */
+        .ctrl-btn {
+            display: flex; align-items: center; justify-content: center;
+            height: 40px; border-radius: 10px; font-weight: 700; cursor: pointer;
+            border: 1px solid var(--border);
+            transition: all 0.15s ease;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .ctrl-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.10); }
+        .ctrl-btn:active:not(:disabled) { transform: scale(0.97); }
+        .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn-primary   { background: var(--accent); border-color: var(--accent); color: white; padding: 0 24px; }
+        .btn-primary:hover:not(:disabled) { background: #3a7de8; }
+        .btn-secondary { background: var(--surface2); color: var(--muted); width: 40px; }
+        .btn-reset     { background: transparent; color: var(--muted); padding: 0 16px; font-size: 12px; }
+
+        /* アルゴリズムボックス */
+        .algo-box {
+            background: #f5fbf7;
+            border: 1.5px solid #b6dfc8;
+            border-radius: 12px;
+            padding: 14px 18px;
+            font-size: 12.5px;
+            line-height: 1.9;
+        }
+        .algo-box .step-num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: #2d6a3f; color: white;
+            font-size: 10px; font-weight: 900; flex-shrink: 0;
+            margin-right: 7px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .algo-box .algo-line        { display: flex; align-items: flex-start; margin-bottom: 3px; border-radius: 6px; padding: 1px 4px; transition: background 0.25s; }
+        .algo-box .algo-line.indent { padding-left: 27px; }
+        .algo-box .kw  { color: #2563eb; font-weight: 700; }
+        .algo-box .hl  { color: #b45309; font-weight: 700; }
+        .algo-box .algo-line.active-algo { background: #fff7e0; }
+
+        .algo-rule {
+            background: var(--surface2);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 10px 14px;
+            font-size: 12px;
+            line-height: 1.75;
+        }
+    </style>
+</head>
+<body>
+<div class="max-w-5xl mx-auto">
+
+    <!-- ヘッダー -->
+    <header class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-black text-[#1e2233]">
+                Algorithm 3.1 &nbsp;<span class="text-[var(--accent)]">最適探索</span>
+            </h1>
+            <p class="text-[var(--muted)] text-xs mt-1">
+                選択基準：開始からの累積コスト <b>g(s)</b> のみを使用（予測値 ĥ(s) は不使用）
+            </p>
+        </div>
+        <div class="algo-rule text-[var(--text)] max-w-sm">
+            <p>● Open List の先頭（<b>g 値最小</b>）のノード s を取り出す</p>
+            <p>● 隣接ノード追加後，<b>g(s) 昇順</b>に並び替える</p>
+        </div>
+    </header>
+
+    <!-- アルゴリズム擬似コード -->
+    <div class="algo-box mb-4">
+        <div class="algo-line" id="al1"><span class="step-num">1</span>初期状態のコスト値を 0 としてオープンリストに追加する．クローズドリストを空に初期化する．</div>
+        <div class="algo-line" id="al2"><span class="step-num">2</span><span class="kw">while</span>&nbsp; オープンリストが空ではない．&nbsp;<span class="kw">do</span></div>
+        <div class="algo-line indent" id="al3"><span class="step-num">3</span>オープンリストから先頭の要素 s を取り出す．クローズドリストに s を追加する（s を探査することに相当）．</div>
+        <div class="algo-line indent" id="al4"><span class="step-num">4</span>s が目標状態ならば，解は発見されたとして探索を終了．</div>
+        <div class="algo-line indent" id="al5"><span class="step-num">5</span>s から接続していてまだ探査していない状態をすべてオープンリストに追加する．オープンリスト内の状態の累積コスト g(s) を再計算し，<span class="hl">累積コストが小さい順に並び替える．</span></div>
+        <div class="algo-line" id="al6"><span class="step-num">6</span><span class="kw">end while</span>&nbsp; 探索を終了．</div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+        <!-- グラフ -->
+        <div class="lg:col-span-3 glass p-4">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-[var(--muted)] uppercase tracking-widest">グラフ（図 3.2）</span>
+                <div class="flex gap-3 text-[10px] text-[var(--muted)]">
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#4f8ef7] inline-block border border-[#4f8ef7]"></span>Open</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#d4891a] inline-block border border-[#d4891a]"></span>展開中</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#1a9e5c] inline-block border border-[#1a9e5c]"></span>Closed</span>
+                </div>
+            </div>
+            <svg id="graph-svg" viewBox="0 0 520 340" class="w-full h-auto">
+                <g id="edges-layer"></g>
+                <g id="nodes-layer"></g>
+            </svg>
+        </div>
+
+        <!-- 右パネル -->
+        <div class="lg:col-span-2 flex flex-col gap-4">
+
+            <!-- Open / Closed リスト -->
+            <div class="glass p-4">
+                <div class="mb-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-2 h-2 rounded-full bg-[var(--accent)] inline-block"></span>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">Open List</span>
+                        <span class="text-[10px] text-[var(--muted)]">（g 値昇順）</span>
+                    </div>
+                    <div id="open-list" class="flex flex-wrap gap-1.5 min-h-[30px]">
+                        <span class="text-[var(--muted)] text-xs italic">空</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-2 h-2 rounded-full bg-[var(--green)] inline-block"></span>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-[var(--green)]">Closed List</span>
+                    </div>
+                    <div id="closed-list" class="flex flex-wrap gap-1.5 min-h-[30px]">
+                        <span class="text-[var(--muted)] text-xs italic">空</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ステップ説明 + ボタン -->
+            <div class="glass p-4 flex flex-col flex-grow">
+                <div class="flex items-baseline gap-2 mb-2">
+                    <span id="step-num" class="font-mono font-black text-[var(--accent2)] text-lg">準備完了</span>
+                </div>
+                <p id="step-desc" class="text-sm text-[var(--text)] leading-relaxed flex-grow" style="white-space:pre-line">
+                    「次へ」ボタンを押して探索を開始してください。
+                </p>
+                <div class="flex gap-2 mt-4">
+                    <button id="prev-btn" class="ctrl-btn btn-secondary" title="前へ">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <button id="reset-btn" class="ctrl-btn btn-reset">リセット</button>
+                    <button id="next-btn" class="ctrl-btn btn-primary flex-grow">次へ →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const nodes = {
+    S: { x: 75,  y: 125 },
+    A: { x: 245, y: 45  },
+    B: { x: 195, y: 170 },
+    C: { x: 365, y: 75  },
+    D: { x: 400, y: 175 },
+    E: { x: 285, y: 210 },
+    F: { x: 175, y: 285 },
+    G: { x: 445, y: 275 },
+};
+
+const edges = [
+    ['S','A', 2],
+    ['S','B', 6],
+    ['A','C', 1],
+    ['A','B', 2],
+    ['B','E', 5],
+    ['B','F', 4],
+    ['C','D', 5],
+    ['C','E', 2],
+    ['D','G', 1],
+    ['E','D', 1],
+    ['E','G', 5],
+];
+
+// g(s) のみで昇順ソート。ĥ(s) は一切使用しない。
+const steps = [
+    {
+        stepNum: '初期化',
+        current: null,
+        openNodes:  ['S'],
+        closedNodes:[],
+        openList:   ['S(0)'],
+        closedList: [],
+        gMap: { S: 0 },
+        algoStep: 'al1',
+        desc: '初期状態 S をコスト g=0 でオープンリストに追加します。クローズドリストは空に初期化されます。'
+    },
+    {
+        stepNum: 'ステップ 1',
+        current: 'S',
+        openNodes:  ['A','B'],
+        closedNodes:['S'],
+        openList:   ['A(2)', 'B(6)'],
+        closedList: ['S(0)'],
+        gMap: { A:2, B:6 },
+        algoStep: 'al3',
+        desc: '【③】Open の先頭 S(g=0) を取り出し Closed へ移動。\n【⑤】隣接ノード A(g=2), B(g=6) を追加し g 値昇順に並び替え。'
+    },
+    {
+        stepNum: 'ステップ 2',
+        current: 'A',
+        openNodes:  ['C','B'],
+        closedNodes:['S','A'],
+        openList:   ['C(3)', 'B(4)'],
+        closedList: ['S(0)', 'A(2)'],
+        gMap: { C:3, B:4 },
+        algoStep: 'al3',
+        desc: '【③】Open の先頭 A(g=2) を取り出し Closed へ移動。\n【⑤】C(g=3) を追加。B は g=4（S→A→B）に更新（旧 g=6 より小）して並び替え。'
+    },
+    {
+        stepNum: 'ステップ 3',
+        current: 'C',
+        openNodes:  ['B','E','D'],
+        closedNodes:['S','A','C'],
+        openList:   ['B(4)', 'E(5)', 'D(8)'],
+        closedList: ['S(0)', 'A(2)', 'C(3)'],
+        gMap: { B:4, E:5, D:8 },
+        algoStep: 'al3',
+        desc: '【③】Open の先頭 C(g=3) を取り出し Closed へ移動。\n【⑤】E(g=5), D(g=8) を追加して g 値昇順に並び替え。'
+    },
+    {
+        stepNum: 'ステップ 4',
+        current: 'B',
+        openNodes:  ['E','D','F'],
+        closedNodes:['S','A','C','B'],
+        openList:   ['E(5)', 'D(8)', 'F(8)'],
+        closedList: ['S(0)', 'A(2)', 'C(3)', 'B(4)'],
+        gMap: { E:5, D:8, F:8 },
+        algoStep: 'al3',
+        desc: '【③】Open の先頭 B(g=4) を取り出し Closed へ移動。\n【⑤】F(g=8) を追加。E は既存 g=5 の方が小さいため更新なし。並び替え。'
+    },
+    {
+        stepNum: 'ステップ 5',
+        current: 'E',
+        openNodes:  ['D','F','G'],
+        closedNodes:['S','A','C','B','E'],
+        openList:   ['D(6)', 'F(8)', 'G(10)'],
+        closedList: ['S(0)', 'A(2)', 'C(3)', 'B(4)', 'E(5)'],
+        gMap: { D:6, F:8, G:10 },
+        algoStep: 'al3',
+        desc: '【③】Open の先頭 E(g=5) を取り出し Closed へ移動。\n【⑤】D を g=6（…E→D）に更新（旧 g=8 より小），G(g=10) を追加して並び替え。'
+    },
+    {
+        stepNum: 'ステップ 6',
+        current: 'D',
+        openNodes:  ['G','F'],
+        closedNodes:['S','A','C','B','E','D'],
+        openList:   ['G(7)', 'F(8)'],
+        closedList: ['S(0)', 'A(2)', 'C(3)', 'B(4)', 'E(5)', 'D(6)'],
+        gMap: { G:7, F:8 },
+        algoStep: 'al3',
+        desc: '【③】Open の先頭 D(g=6) を取り出し Closed へ移動。\n【⑤】G を g=7（…D→G）に更新（旧 g=10 より小）して先頭へ。並び替え。'
+    },
+    {
+        stepNum: 'ステップ 7',
+        current: 'G',
+        openNodes:  [],
+        closedNodes:['S','A','C','B','E','D','G'],
+        openList:   [],
+        closedList: ['S(0)', 'A(2)', 'C(3)', 'B(4)', 'E(5)', 'D(6)', 'G(7)'],
+        gMap: {},
+        algoStep: 'al4',
+        goal: true,
+        desc: '【③】Open の先頭 G(g=7) を取り出し Closed へ移動。\n【④】G はゴールノードです。解が発見されました！\n最適コスト g(G) = 7。探索終了。'
+    },
+];
+
+let currentIdx = 0;
+
+function svgEl(tag) {
+    return document.createElementNS('http://www.w3.org/2000/svg', tag);
+}
+
+function initGraph() {
+    const eL = document.getElementById('edges-layer');
+    const nL = document.getElementById('nodes-layer');
+
+    edges.forEach(([u, v, c]) => {
+        const nu = nodes[u], nv = nodes[v];
+        const dx = nv.x - nu.x, dy = nv.y - nu.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const r = 21;
+
+        const line = svgEl('line');
+        line.setAttribute('x1', nu.x + dx/len*r); line.setAttribute('y1', nu.y + dy/len*r);
+        line.setAttribute('x2', nv.x - dx/len*r); line.setAttribute('y2', nv.y - dy/len*r);
+        line.setAttribute('class', 'edge-default');
+        eL.appendChild(line);
+
+        const mx = (nu.x + nv.x) / 2;
+        const my = (nu.y + nv.y) / 2;
+        const ox = -dy/len * 11, oy = dx/len * 11;
+        const lbl = svgEl('text');
+        lbl.setAttribute('x', mx + ox); lbl.setAttribute('y', my + oy);
+        lbl.setAttribute('text-anchor', 'middle');
+        lbl.setAttribute('dominant-baseline', 'central');
+        lbl.setAttribute('class', 'edge-cost');
+        lbl.textContent = c;
+        eL.appendChild(lbl);
+    });
+
+    Object.entries(nodes).forEach(([id, n]) => {
+        const g = svgEl('g');
+        g.setAttribute('id', `node-${id}`);
+        g.setAttribute('class', id === 'S' ? 'node-start' : id === 'G' ? 'node-goal' : 'node-default');
+
+        const ring = svgEl('circle');
+        ring.setAttribute('cx', n.x); ring.setAttribute('cy', n.y); ring.setAttribute('r', 25);
+        ring.setAttribute('fill', 'none');
+        ring.setAttribute('stroke', '#d4891a');
+        ring.setAttribute('stroke-width', '3');
+        ring.setAttribute('stroke-opacity', '0');
+        ring.setAttribute('id', `ring-${id}`);
+        g.appendChild(ring);
+
+        const circle = svgEl('circle');
+        circle.setAttribute('cx', n.x); circle.setAttribute('cy', n.y); circle.setAttribute('r', 20);
+        circle.setAttribute('class', 'node-circle');
+        g.appendChild(circle);
+
+        const txt = svgEl('text');
+        txt.setAttribute('x', n.x); txt.setAttribute('y', n.y + 5);
+        txt.setAttribute('text-anchor', 'middle');
+        txt.setAttribute('class', 'node-text');
+        txt.textContent = id;
+        g.appendChild(txt);
+
+        const gLbl = svgEl('text');
+        gLbl.setAttribute('x', n.x); gLbl.setAttribute('y', n.y + 37);
+        gLbl.setAttribute('text-anchor', 'middle');
+        gLbl.setAttribute('class', 'g-label');
+        gLbl.setAttribute('opacity', '0');
+        gLbl.setAttribute('id', `glbl-${id}`);
+        g.appendChild(gLbl);
+
+        nL.appendChild(g);
+    });
+}
+
+function updateUI() {
+    const step = steps[currentIdx];
+
+    document.getElementById('step-num').textContent = step.stepNum;
+    document.getElementById('step-desc').textContent = step.desc;
+
+    document.getElementById('prev-btn').disabled = currentIdx === 0;
+    const nextBtn = document.getElementById('next-btn');
+    if (step.goal) {
+        nextBtn.textContent = '完了 ✓';
+        nextBtn.disabled = true;
+    } else {
+        nextBtn.textContent = '次へ →';
+        nextBtn.disabled = currentIdx === steps.length - 1;
+    }
+
+    // 擬似コードハイライト
+    ['al1','al2','al3','al4','al5','al6'].forEach(id => {
+        document.getElementById(id).classList.remove('active-algo');
+    });
+    if (step.algoStep) {
+        document.getElementById(step.algoStep).classList.add('active-algo');
+    }
+
+    const openSet   = new Set(step.openNodes);
+    const closedSet = new Set(step.closedNodes);
+
+    Object.keys(nodes).forEach(id => {
+        const g    = document.getElementById(`node-${id}`);
+        const ring = document.getElementById(`ring-${id}`);
+        const gLbl = document.getElementById(`glbl-${id}`);
+
+        g.classList.remove('node-default','node-open','node-current','node-closed','node-start','node-goal');
+        ring.setAttribute('stroke-opacity', '0');
+        ring.classList.remove('pulse-anim');
+        gLbl.setAttribute('opacity', '0');
+
+        if (id === step.current) {
+            g.classList.add('node-current');
+            ring.setAttribute('stroke-opacity', '0.85');
+            ring.classList.add('pulse-anim');
+        } else if (closedSet.has(id)) {
+            g.classList.add('node-closed');
+        } else if (openSet.has(id)) {
+            g.classList.add('node-open');
+            if (step.gMap && step.gMap[id] !== undefined) {
+                gLbl.textContent = `g=${step.gMap[id]}`;
+                gLbl.setAttribute('opacity', '1');
+            }
+        } else if (id === 'S') {
+            g.classList.add('node-start');
+        } else if (id === 'G') {
+            g.classList.add('node-goal');
+        } else {
+            g.classList.add('node-default');
+        }
+    });
+
+    renderBadgeList('open-list',   step.openList,   'badge-open');
+    renderBadgeList('closed-list', step.closedList, 'badge-closed');
+}
+
+function renderBadgeList(containerId, items, cls) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    if (!items || items.length === 0) {
+        el.innerHTML = '<span class="text-[var(--muted)] text-xs italic">空</span>';
+        return;
+    }
+    items.forEach(item => {
+        const badge = document.createElement('span');
+        badge.className = `badge ${cls}`;
+        badge.textContent = item;
+        el.appendChild(badge);
+    });
+}
+
+document.getElementById('next-btn').addEventListener('click', () => {
+    if (currentIdx < steps.length - 1) { currentIdx++; updateUI(); }
+});
+document.getElementById('prev-btn').addEventListener('click', () => {
+    if (currentIdx > 0) { currentIdx--; updateUI(); }
+});
+document.getElementById('reset-btn').addEventListener('click', () => {
+    currentIdx = 0;
+    document.getElementById('next-btn').textContent = '次へ →';
+    document.getElementById('next-btn').disabled = false;
+    updateUI();
+});
+
+window.onload = () => { initGraph(); updateUI(); };
+</script>
+</body>
+</html>

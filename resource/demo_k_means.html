@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-means クラスタリングアルゴリズムの可視化</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定义一些滚动条样式和基础样式 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        input[type=range] {
+            accent-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- 顶部导航栏 -->
+    <header class="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded bg-blue-500 text-white flex items-center justify-center font-bold text-lg">K</div>
+            <h1 class="text-xl font-bold text-gray-800">K-means クラスタリングアルゴリズムの可視化</h1>
+        </div>
+        <div class="text-sm text-gray-500">
+            アルゴリズムのステップバイステップの反復プロセスを理解する
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="flex-1 flex gap-4 p-4 min-h-0 overflow-hidden">
+        
+        <!-- 左侧：Canvas 渲染区 -->
+        <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 relative overflow-hidden flex flex-col">
+            <div class="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 shadow-sm border border-gray-100 z-10" id="status-badge">
+                初期化待ち
+            </div>
+            <canvas id="kmeans-canvas" class="flex-1 w-full h-full cursor-crosshair"></canvas>
+        </div>
+
+        <!-- 右侧：控制面板 -->
+        <aside class="w-80 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col shrink-0 overflow-hidden">
+            <div class="p-4 border-b border-gray-100 bg-gray-50 font-semibold text-gray-700">
+                コントロールパネル
+            </div>
+            
+            <div class="p-5 overflow-y-auto flex-1 flex flex-col gap-6">
+                
+                <!-- 1. 数据生成 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">1. データの生成</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <label>データポイント数 (<span id="points-count-label">150</span>)</label>
+                        </div>
+                        <input type="range" id="points-count" min="20" max="500" value="150" class="w-full">
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btn-gen-random" class="flex-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded transition-colors">一様分布</button>
+                        <button id="btn-gen-clusters" class="flex-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded transition-colors">ガウス分布</button>
+                    </div>
+                </section>
+
+                <hr class="border-gray-100">
+
+                <!-- 2. 算法参数 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">2. アルゴリズム設定</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <label>クラスタ中心数 K (<span id="k-count-label">3</span>)</label>
+                        </div>
+                        <input type="range" id="k-count" min="2" max="10" value="3" class="w-full">
+                    </div>
+                    <div class="space-y-1 text-sm">
+                        <label class="block text-gray-600">初期化戦略</label>
+                        <select id="init-strategy" class="w-full p-2 bg-gray-50 border border-gray-200 rounded outline-none focus:border-blue-500">
+                            <option value="random">ランダム分布 (Random)</option>
+                            <option value="kmeans++">K-means++ (推奨)</option>
+                        </select>
+                    </div>
+                </section>
+
+                <hr class="border-gray-100">
+
+                <!-- 3. 执行控制 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">3. 実行コントロール</h3>
+                    <button id="btn-init" class="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        アルゴリズムを初期化
+                    </button>
+                    
+                    <div class="flex gap-2">
+                        <button id="btn-step" disabled class="flex-1 py-2 bg-gray-100 text-gray-700 font-medium rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            ステップ実行
+                        </button>
+                        <button id="btn-play" disabled class="flex-1 py-2 bg-green-50 text-green-700 font-medium rounded border border-green-200 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            自動再生
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-1 pt-2">
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <label>再生速度</label>
+                            <span><span id="speed-label">遅い</span></span>
+                        </div>
+                        <input type="range" id="play-speed" min="1" max="10" value="3" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </section>
+
+                <!-- 状态与解释卡片 -->
+                <div class="mt-auto bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <h4 class="text-sm font-bold text-blue-800 mb-1" id="info-title">ようこそ</h4>
+                    <p class="text-xs text-blue-700 leading-relaxed" id="info-desc">
+                        上のボタンでデータポイントを生成し、「アルゴリズムを初期化」をクリックしてK-meansの反復プロセスのデモを開始してください。
+                    </p>
+                </div>
+
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        /**
+         * K-means 算法与可视化逻辑
+         */
+
+        // --- 配置与状态 ---
+        const colors = [
+            '#ef4444', // Red
+            '#3b82f6', // Blue
+            '#10b981', // Green
+            '#f59e0b', // Amber
+            '#8b5cf6', // Violet
+            '#ec4899', // Pink
+            '#06b6d4', // Cyan
+            '#f97316', // Orange
+            '#84cc16', // Lime
+            '#64748b'  // Slate
+        ];
+
+        const state = {
+            points: [],       // {x, y, cluster: null, prevCluster: null}
+            centroids: [],    // {x, y, color, targetX, targetY}
+            k: 3,
+            phase: 'IDLE',    // IDLE, INIT, ASSIGN, UPDATE, CONVERGED
+            iteration: 0,
+            isPlaying: false,
+            animProgress: 1,  // 用于平滑动画 (0 -> 1)
+            playTimer: null
+        };
+
+        // --- DOM 元素引用 ---
+        const canvas = document.getElementById('kmeans-canvas');
+        const ctx = canvas.getContext('2d');
+        const btnGenRandom = document.getElementById('btn-gen-random');
+        const btnGenClusters = document.getElementById('btn-gen-clusters');
+        const sliderPoints = document.getElementById('points-count');
+        const labelPoints = document.getElementById('points-count-label');
+        const sliderK = document.getElementById('k-count');
+        const labelK = document.getElementById('k-count-label');
+        const selectInitStrategy = document.getElementById('init-strategy');
+        const btnInit = document.getElementById('btn-init');
+        const btnStep = document.getElementById('btn-step');
+        const btnPlay = document.getElementById('btn-play');
+        const sliderSpeed = document.getElementById('play-speed');
+        const statusBadge = document.getElementById('status-badge');
+        const infoTitle = document.getElementById('info-title');
+        const infoDesc = document.getElementById('info-desc');
+
+        // --- 坐标系转换 (统一使用 [0,1] 区间的内部坐标) ---
+        // 渲染时乘以实际的 canvas 宽高，以实现自适应大小
+        function toCanvasX(x) { return x * canvas.width; }
+        function toCanvasY(y) { return y * canvas.height; }
+
+        // --- 数据生成逻辑 ---
+        function generateRandomData(count) {
+            state.points = [];
+            for (let i = 0; i < count; i++) {
+                state.points.push({
+                    x: Math.random() * 0.9 + 0.05, // 避免太靠边
+                    y: Math.random() * 0.9 + 0.05,
+                    cluster: null
+                });
+            }
+            resetAlgorithm();
+        }
+
+        // Box-Muller 变换生成正态分布随机数
+        function randomGaussian() {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        function generateClusteredData(count) {
+            state.points = [];
+            // 随机生成 3-5 个中心簇
+            const numClusters = Math.floor(Math.random() * 3) + 3;
+            const clusterCenters = [];
+            for (let i = 0; i < numClusters; i++) {
+                clusterCenters.push({
+                    x: Math.random() * 0.7 + 0.15,
+                    y: Math.random() * 0.7 + 0.15
+                });
+            }
+
+            for (let i = 0; i < count; i++) {
+                const center = clusterCenters[Math.floor(Math.random() * numClusters)];
+                // 使用正态分布添加偏移，方差较小
+                let px = center.x + randomGaussian() * 0.06;
+                let py = center.y + randomGaussian() * 0.06;
+                
+                // 限制在边界内
+                px = Math.max(0.02, Math.min(0.98, px));
+                py = Math.max(0.02, Math.min(0.98, py));
+
+                state.points.push({ x: px, y: py, cluster: null });
+            }
+            resetAlgorithm();
+        }
+
+        function resetAlgorithm() {
+            state.centroids = [];
+            state.points.forEach(p => p.cluster = null);
+            state.phase = 'IDLE';
+            state.iteration = 0;
+            stopAutoPlay();
+            updateUI();
+            draw();
+        }
+
+        // --- 核心 K-means 算法步骤 ---
+
+        function distanceSq(p1, p2) {
+            return (p1.x - p2.x)**2 + (p1.y - p2.y)**2;
+        }
+
+        // 初始化
+        function initAlgorithm() {
+            state.k = parseInt(sliderK.value);
+            const strategy = selectInitStrategy.value;
+            state.centroids = [];
+            state.points.forEach(p => p.cluster = null);
+            state.iteration = 1;
+            state.animProgress = 1;
+
+            if (state.points.length === 0) generateRandomData(parseInt(sliderPoints.value));
+
+            if (strategy === 'random') {
+                // 完全随机选择 K 个点作为初始中心
+                const shuffled = [...state.points].sort(() => 0.5 - Math.random());
+                for (let i = 0; i < state.k; i++) {
+                    state.centroids.push({
+                        x: shuffled[i].x,
+                        y: shuffled[i].y,
+                        targetX: shuffled[i].x,
+                        targetY: shuffled[i].y,
+                        color: colors[i % colors.length]
+                    });
+                }
+            } else if (strategy === 'kmeans++') {
+                // K-means++ 初始化
+                // 1. 随机选第一个
+                let firstIndex = Math.floor(Math.random() * state.points.length);
+                let firstPt = state.points[firstIndex];
+                state.centroids.push({
+                    x: firstPt.x, y: firstPt.y, targetX: firstPt.x, targetY: firstPt.y, color: colors[0]
+                });
+
+                // 2. 依次选择剩下的 k-1 个点
+                for (let i = 1; i < state.k; i++) {
+                    let distancesSq = state.points.map(p => {
+                        let minDSq = Infinity;
+                        for (let c of state.centroids) {
+                            let dSq = distanceSq(p, c);
+                            if (dSq < minDSq) minDSq = dSq;
+                        }
+                        return minDSq;
+                    });
+
+                    // 计算总权重并按概率选取
+                    let sumSq = distancesSq.reduce((a, b) => a + b, 0);
+                    let rand = Math.random() * sumSq;
+                    let cumulative = 0;
+                    let selectedIndex = 0;
+                    for (let j = 0; j < distancesSq.length; j++) {
+                        cumulative += distancesSq[j];
+                        if (cumulative >= rand) {
+                            selectedIndex = j;
+                            break;
+                        }
+                    }
+
+                    let selectedPt = state.points[selectedIndex];
+                    state.centroids.push({
+                        x: selectedPt.x, y: selectedPt.y, targetX: selectedPt.x, targetY: selectedPt.y, color: colors[i % colors.length]
+                    });
+                }
+            }
+
+            state.phase = 'INIT';
+            updateUI();
+            draw();
+            
+            // 自动流转到等待分配状态
+            setTimeout(() => {
+                if (state.phase === 'INIT') {
+                    state.phase = 'ASSIGN';
+                    updateUI();
+                }
+            }, 500);
+        }
+
+        // 第一步：分配点到最近的中心
+        function assignPoints() {
+            let changed = false;
+            
+            state.points.forEach(p => {
+                let minDst = Infinity;
+                let closestCluster = null;
+                
+                state.centroids.forEach((c, idx) => {
+                    let dst = distanceSq(p, c);
+                    if (dst < minDst) {
+                        minDst = dst;
+                        closestCluster = idx;
+                    }
+                });
+
+                if (p.cluster !== closestCluster) {
+                    changed = true;
+                    p.cluster = closestCluster;
+                }
+            });
+
+            state.phase = 'UPDATE';
+            updateUI();
+            draw();
+            return changed;
+        }
+
+        // 第二步：更新中心点位置 (带动画设置)
+        function updateCentroids() {
+            // 计算新的中心点位置
+            let newCenters = Array(state.k).fill(0).map(() => ({sumX: 0, sumY: 0, count: 0}));
+            
+            state.points.forEach(p => {
+                if (p.cluster !== null) {
+                    newCenters[p.cluster].sumX += p.x;
+                    newCenters[p.cluster].sumY += p.y;
+                    newCenters[p.cluster].count++;
+                }
+            });
+
+            let maxMoveSq = 0;
+
+            state.centroids.forEach((c, idx) => {
+                if (newCenters[idx].count > 0) {
+                    let nX = newCenters[idx].sumX / newCenters[idx].count;
+                    let nY = newCenters[idx].sumY / newCenters[idx].count;
+                    
+                    let moveSq = distanceSq(c, {x: nX, y: nY});
+                    if (moveSq > maxMoveSq) maxMoveSq = moveSq;
+
+                    c.targetX = nX;
+                    c.targetY = nY;
+                }
+            });
+
+            // 触发平滑移动动画
+            state.animProgress = 0;
+            animateCentroids(maxMoveSq);
+        }
+
+        // 动画循环
+        function animateCentroids(maxMoveSq) {
+            // 决定动画速度
+            const speedScale = parseInt(sliderSpeed.value); // 1 to 10
+            const step = 0.02 * (speedScale / 3); // 速度系数
+
+            state.animProgress += step;
+            if (state.animProgress >= 1) {
+                state.animProgress = 1;
+                // 动画结束，锁定实际位置
+                state.centroids.forEach(c => {
+                    c.x = c.targetX;
+                    c.y = c.targetY;
+                });
+                
+                state.iteration++;
+                
+                // 判断是否收敛 (移动距离极其微小)
+                if (maxMoveSq < 0.000001) {
+                    state.phase = 'CONVERGED';
+                    stopAutoPlay();
+                } else {
+                    state.phase = 'ASSIGN';
+                }
+                
+                updateUI();
+                draw();
+                return; // 结束动画循环
+            }
+
+            // 插值计算当前显示坐标 (仅在绘制时计算，实际坐标c.x不在此处更新以允许中途取消)
+            draw();
+            requestAnimationFrame(() => animateCentroids(maxMoveSq));
+        }
+
+        // 单步操作分发
+        function doNextStep() {
+            if (state.phase === 'ASSIGN') {
+                assignPoints();
+            } else if (state.phase === 'UPDATE') {
+                updateCentroids();
+            }
+        }
+
+        // --- 渲染逻辑 ---
+        function draw() {
+            // 确保画布尺寸和 CSS 像素一致，解决模糊问题
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            
+            const w = canvas.offsetWidth;
+            const h = canvas.offsetHeight;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // 保持 axis equal：取宽高中较小的值作为绘图区域的基准尺寸，并居中显示
+            const size = Math.min(w, h);
+            const offsetX = (w - size) / 2;
+            const offsetY = (h - size) / 2;
+
+            // 坐标映射辅助函数：将 [0, 1] 的内部坐标映射到保持等比的屏幕像素上
+            const getX = (nx) => nx * size + offsetX;
+            const getY = (ny) => ny * size + offsetY;
+
+            // 1. 绘制连线 (仅在分配状态或点已分配时显示微弱的线)
+            if (state.centroids.length > 0 && state.phase !== 'INIT') {
+                ctx.lineWidth = 0.5;
+                state.points.forEach(p => {
+                    if (p.cluster !== null) {
+                        // 如果正在更新中心点动画，连线应该连到当前的插值中心
+                        let c = state.centroids[p.cluster];
+                        let curCx = c.x + (c.targetX - c.x) * easeOutCubic(state.animProgress);
+                        let curCy = c.y + (c.targetY - c.y) * easeOutCubic(state.animProgress);
+
+                        ctx.beginPath();
+                        ctx.moveTo(getX(p.x), getY(p.y));
+                        ctx.lineTo(getX(curCx), getY(curCy));
+                        
+                        // 连线颜色为簇颜色的极度透明版
+                        ctx.strokeStyle = hexToRgba(c.color, 0.15);
+                        ctx.stroke();
+                    }
+                });
+            }
+
+            // 2. 绘制数据点
+            state.points.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(getX(p.x), getY(p.y), 4, 0, Math.PI * 2);
+                if (p.cluster === null) {
+                    ctx.fillStyle = '#cbd5e1'; // 未分配灰色
+                } else {
+                    ctx.fillStyle = hexToRgba(state.centroids[p.cluster].color, 0.8);
+                }
+                ctx.fill();
+            });
+
+            // 3. 绘制聚类中心 (如果是动画中，使用插值位置)
+            state.centroids.forEach(c => {
+                let curCx = c.x + (c.targetX - c.x) * easeOutCubic(state.animProgress);
+                let curCy = c.y + (c.targetY - c.y) * easeOutCubic(state.animProgress);
+                let px = getX(curCx);
+                let py = getY(curCy);
+
+                // 绘制一个外发光
+                ctx.beginPath();
+                ctx.arc(px, py, 12, 0, Math.PI * 2);
+                ctx.fillStyle = hexToRgba(c.color, 0.3);
+                ctx.fill();
+
+                // 绘制内部十字/加号，更明显
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#1e293b'; // 深灰色边缘，使其在同色点中凸显
+                ctx.beginPath();
+                ctx.moveTo(px - 6, py); ctx.lineTo(px + 6, py);
+                ctx.moveTo(px, py - 6); ctx.lineTo(px, py + 6);
+                ctx.stroke();
+
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = c.color;
+                ctx.beginPath();
+                ctx.moveTo(px - 5, py); ctx.lineTo(px + 5, py);
+                ctx.moveTo(px, py - 5); ctx.lineTo(px, py + 5);
+                ctx.stroke();
+            });
+        }
+
+        // 缓动函数
+        function easeOutCubic(x) {
+            return 1 - Math.pow(1 - x, 3);
+        }
+
+        // 颜色透明度处理
+        function hexToRgba(hex, alpha) {
+            let r = parseInt(hex.slice(1, 3), 16),
+                g = parseInt(hex.slice(3, 5), 16),
+                b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        // --- 交互与生命周期 ---
+
+        function updateUI() {
+            // 按钮状态
+            if (state.phase === 'IDLE' || state.phase === 'INIT' || state.phase === 'CONVERGED') {
+                btnStep.disabled = true;
+                btnPlay.disabled = true;
+            } else {
+                btnStep.disabled = state.animProgress < 1; // 动画期间禁止步进
+                btnPlay.disabled = false;
+            }
+
+            // 更新单步执行按钮文本
+            if (state.phase === 'CONVERGED') {
+                btnStep.textContent = '完了';
+            } else {
+                btnStep.textContent = 'ステップ実行';
+            }
+
+            // 播放按钮文本
+            btnPlay.innerHTML = state.isPlaying ? 
+                '<span class="text-red-600">一時停止</span>' : '自動再生';
+
+            // 顶部状态标识
+            let badgeText = '';
+            let badgeColorClass = '';
+            
+            switch(state.phase) {
+                case 'IDLE': 
+                    badgeText = '初期化待ち'; badgeColorClass = 'text-gray-600'; break;
+                case 'INIT': 
+                    badgeText = '初期化完了'; badgeColorClass = 'text-blue-600'; break;
+                case 'ASSIGN': 
+                    badgeText = `反復 ${state.iteration}: 割り当てフェーズ`; badgeColorClass = 'text-orange-600'; break;
+                case 'UPDATE': 
+                    badgeText = `反復 ${state.iteration}: 更新フェーズ`; badgeColorClass = 'text-purple-600'; break;
+                case 'CONVERGED': 
+                    badgeText = `アルゴリズムが収束しました (合計 ${state.iteration} 回の反復)`; badgeColorClass = 'text-green-600'; break;
+            }
+            statusBadge.textContent = badgeText;
+            statusBadge.className = `absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded text-sm font-bold shadow-sm border border-gray-100 z-10 ${badgeColorClass}`;
+
+            // 右侧解释文本
+            switch(state.phase) {
+                case 'IDLE':
+                    infoTitle.textContent = "準備完了";
+                    infoTitle.className = "text-sm font-bold text-gray-800 mb-1";
+                    infoDesc.textContent = "データを生成し、K値を選択して、初期化をクリックしてください。";
+                    break;
+                case 'INIT':
+                    infoTitle.textContent = "初期中心が選択されました";
+                    infoTitle.className = "text-sm font-bold text-blue-800 mb-1";
+                    infoDesc.textContent = `${selectInitStrategy.options[selectInitStrategy.selectedIndex].text} 戦略を使用して、キャンバス上に ${state.k} 個の初期クラスタ中心 (十字マーク) を配置しました。ステップ実行をクリックして次のステップに進みます。`;
+                    break;
+                case 'ASSIGN':
+                    infoTitle.textContent = "ステップ 1：データポイントの関連付け";
+                    infoTitle.className = "text-sm font-bold text-orange-800 mb-1";
+                    infoDesc.textContent = "すべての灰色のデータポイントを反復処理し、各クラスタ中心までの距離を計算して、最も近い中心に属するようにマーク（色付け）します。";
+                    break;
+                case 'UPDATE':
+                    infoTitle.textContent = "ステップ 2：中心位置の更新";
+                    infoTitle.className = "text-sm font-bold text-purple-800 mb-1";
+                    infoDesc.textContent = "ポイントの割り当てが完了しました。次に、同じ色のデータポイントの各グループの物理的な中心点 (平均) を計算し、対応するクラスタ中心をその新しい位置に移動します。";
+                    break;
+                case 'CONVERGED':
+                    infoTitle.textContent = "アルゴリズムが収束しました 🎉";
+                    infoTitle.className = "text-sm font-bold text-green-800 mb-1";
+                    infoDesc.textContent = "今回の更新では、すべてのクラスタ中心が移動しなくなりました。これは、アルゴリズムが最終的な局所最適解を見つけたことを意味します。K-means クラスタリングの完了です！";
+                    break;
+            }
+        }
+
+        function toggleAutoPlay() {
+            state.isPlaying = !state.isPlaying;
+            if (state.isPlaying) {
+                runAutoPlayLoop();
+            } else {
+                stopAutoPlay();
+            }
+            updateUI();
+        }
+
+        function stopAutoPlay() {
+            state.isPlaying = false;
+            if (state.playTimer) {
+                clearTimeout(state.playTimer);
+                state.playTimer = null;
+            }
+        }
+
+        function runAutoPlayLoop() {
+            if (!state.isPlaying) return;
+            
+            if (state.phase === 'CONVERGED') {
+                stopAutoPlay();
+                updateUI();
+                return;
+            }
+
+            // 如果当前在播放且动画已结束，则执行下一步
+            if (state.animProgress >= 1) {
+                doNextStep();
+            }
+
+            // 根据速度动态设置延迟 (快则延迟短)
+            const speed = parseInt(sliderSpeed.value); // 1 (慢) to 10 (快)
+            let delay = 1200 - (speed * 100); 
+            if (delay < 100) delay = 100;
+            
+            // 如果是更新动画期间，不需要额外延迟，动画本身会请求帧
+            if (state.phase === 'UPDATE' && state.animProgress < 1) {
+                delay = 100; // 短轮询检查动画是否结束
+            }
+
+            state.playTimer = setTimeout(runAutoPlayLoop, delay);
+        }
+
+        // --- 事件监听 ---
+        btnGenRandom.addEventListener('click', () => {
+            generateRandomData(parseInt(sliderPoints.value));
+        });
+
+        btnGenClusters.addEventListener('click', () => {
+            generateClusteredData(parseInt(sliderPoints.value));
+        });
+
+        sliderPoints.addEventListener('input', (e) => {
+            labelPoints.textContent = e.target.value;
+            // 当拖动滑块时自动重置为均匀分布（提供实时反馈）
+            generateRandomData(parseInt(e.target.value));
+        });
+
+        sliderK.addEventListener('input', (e) => {
+            labelK.textContent = e.target.value;
+            resetAlgorithm();
+        });
+
+        selectInitStrategy.addEventListener('change', resetAlgorithm);
+
+        btnInit.addEventListener('click', () => {
+            initAlgorithm();
+        });
+
+        btnStep.addEventListener('click', () => {
+            stopAutoPlay();
+            doNextStep();
+        });
+
+        btnPlay.addEventListener('click', () => {
+            toggleAutoPlay();
+        });
+
+        sliderSpeed.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            const label = document.getElementById('speed-label');
+            if (val <= 3) label.textContent = '遅い';
+            else if (val <= 7) label.textContent = '普通';
+            else label.textContent = '速い';
+        });
+
+        // 窗口尺寸变化处理
+        window.addEventListener('resize', () => {
+            draw();
+        });
+
+        // 初始化默认数据
+        generateClusteredData(parseInt(sliderPoints.value));
+
+    </script>
+</body>
+</html>

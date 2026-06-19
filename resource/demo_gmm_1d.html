@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ガウス混合モデル (GMM) EMアルゴリズムの可視化</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        input[type=range] { accent-color: #8b5cf6; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- 顶部导航栏 -->
+    <header class="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded bg-violet-500 text-white flex items-center justify-center font-bold text-lg">G</div>
+            <h1 class="text-xl font-bold text-gray-800">GMM (ガウス混合モデル) EMアルゴリズムの可視化</h1>
+        </div>
+        <div class="text-sm text-gray-500">
+            1Dデータにおける期待値最大化(EM)アルゴリズムの反復プロセスを理解する
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="flex-1 flex gap-4 p-4 min-h-0 overflow-hidden">
+        
+        <!-- 左侧：Canvas 渲染区 -->
+        <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 relative overflow-hidden flex flex-col">
+            <div class="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 shadow-sm border border-gray-100 z-10" id="status-badge">
+                初期化待ち
+            </div>
+            <!-- Log-likelihood 展示 -->
+            <div class="absolute top-4 right-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-lg text-sm font-mono text-gray-600 shadow-sm border border-gray-100 z-10" id="ll-badge" style="display: none;">
+                対数尤度 (LL): <span id="ll-value">0.00</span>
+            </div>
+            <canvas id="gmm-canvas" class="flex-1 w-full h-full"></canvas>
+        </div>
+
+        <!-- 右侧：控制面板 -->
+        <aside class="w-80 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col shrink-0 overflow-hidden">
+            <div class="p-4 border-b border-gray-100 bg-gray-50 font-semibold text-gray-700">
+                コントロールパネル
+            </div>
+            
+            <div class="p-5 overflow-y-auto flex-1 flex flex-col gap-6">
+                
+                <!-- 1. 数据生成 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">1. 1次元データの生成</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <label>データポイント数 (<span id="points-count-label">500</span>)</label>
+                        </div>
+                        <input type="range" id="points-count" min="100" max="2000" value="500" step="100" class="w-full">
+                    </div>
+                </section>
+
+                <hr class="border-gray-100">
+
+                <!-- 2. 算法参数 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">2. モデル設定</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <label>混合成分数 K (<span id="k-count-label">3</span>)</label>
+                        </div>
+                        <input type="range" id="k-count" min="1" max="6" value="3" class="w-full">
+                    </div>
+                </section>
+
+                <hr class="border-gray-100">
+
+                <!-- 3. 执行控制 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">3. 実行コントロール</h3>
+                    <button id="btn-init" class="w-full py-2.5 bg-violet-500 hover:bg-violet-600 text-white font-medium rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        GMMを初期化
+                    </button>
+                    
+                    <div class="flex gap-2">
+                        <button id="btn-step" disabled class="flex-1 py-2 bg-gray-100 text-gray-700 font-medium rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            ステップ実行
+                        </button>
+                        <button id="btn-play" disabled class="flex-1 py-2 bg-green-50 text-green-700 font-medium rounded border border-green-200 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            自動再生
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-1 pt-2">
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <label>再生速度</label>
+                            <span><span id="speed-label">普通</span></span>
+                        </div>
+                        <input type="range" id="play-speed" min="1" max="10" value="5" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </section>
+
+                <!-- 状态与解释卡片 -->
+                <div class="mt-auto bg-violet-50 rounded-lg p-4 border border-violet-100">
+                    <h4 class="text-sm font-bold text-violet-800 mb-1" id="info-title">ようこそ</h4>
+                    <p class="text-xs text-violet-700 leading-relaxed" id="info-desc">
+                        スライダーでデータポイント数を調整し、「GMMを初期化」をクリックしてEMアルゴリズムのプロセスを開始してください。
+                    </p>
+                </div>
+
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        /**
+         * 1D GMM (高斯混合模型) EM算法与可视化逻辑
+         */
+
+        // --- 配置与状态 ---
+        const colors = [
+            '#ef4444', // Red
+            '#3b82f6', // Blue
+            '#10b981', // Green
+            '#f59e0b', // Amber
+            '#8b5cf6', // Violet
+            '#ec4899', // Pink
+        ];
+
+        const state = {
+            data: [],         // 1D data points [0, 1]
+            histogram: [],    // { x, width, count, density }
+            components: [],   // { mu, sigma, pi, color, oldMu, oldSigma, oldPi }
+            responsibilities: [], // N x K matrix
+            k: 3,
+            phase: 'IDLE',    // IDLE, INIT, E_STEP, M_STEP, CONVERGED
+            iteration: 0,
+            isPlaying: false,
+            animProgress: 1,  // 0 -> 1 for smooth transitions
+            playTimer: null,
+            logLikelihood: -Infinity,
+            prevLogLikelihood: -Infinity,
+            
+            // 渲染控制
+            currentMaxY: 1.0,
+            targetMaxY: 1.0
+        };
+
+        // --- DOM 元素引用 ---
+        const canvas = document.getElementById('gmm-canvas');
+        const ctx = canvas.getContext('2d');
+        const sliderPoints = document.getElementById('points-count');
+        const labelPoints = document.getElementById('points-count-label');
+        const sliderK = document.getElementById('k-count');
+        const labelK = document.getElementById('k-count-label');
+        const btnInit = document.getElementById('btn-init');
+        const btnStep = document.getElementById('btn-step');
+        const btnPlay = document.getElementById('btn-play');
+        const sliderSpeed = document.getElementById('play-speed');
+        const statusBadge = document.getElementById('status-badge');
+        const infoTitle = document.getElementById('info-title');
+        const infoDesc = document.getElementById('info-desc');
+        const llBadge = document.getElementById('ll-badge');
+        const llValue = document.getElementById('ll-value');
+
+        // --- 数据生成逻辑 ---
+
+        // Box-Muller 变换生成正态分布随机数
+        function randomGaussian(mu = 0, sigma = 1) {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            return z * sigma + mu;
+        }
+
+        function generateMultiModalData(count) {
+            state.data = [];
+            state.trueParams = []; // 【修改】保存生成数据所用的真实参数
+            // 设定 2-4 个真实的峰
+            const trueK = Math.floor(Math.random() * 3) + 2;
+            for(let i=0; i<trueK; i++) {
+                state.trueParams.push({
+                    mu: Math.random() * 0.7 + 0.15,
+                    sigma: Math.random() * 0.05 + 0.03,
+                    pi: Math.random() + 0.2
+                });
+            }
+            // 归一化真实权重
+            let totalPi = state.trueParams.reduce((sum, p) => sum + p.pi, 0);
+            state.trueParams.forEach(p => p.pi /= totalPi);
+
+            for (let i = 0; i < count; i++) {
+                // 依概率选择一个簇
+                let r = Math.random();
+                let cumulative = 0;
+                let selected = state.trueParams[state.trueParams.length - 1];
+                for(let p of state.trueParams) {
+                    cumulative += p.pi;
+                    if(r <= cumulative) {
+                        selected = p;
+                        break;
+                    }
+                }
+                
+                let val = randomGaussian(selected.mu, selected.sigma);
+                // 稍微截断在 [0,1] 范围内
+                val = Math.max(0.01, Math.min(0.99, val));
+                state.data.push(val);
+            }
+            processData();
+        }
+
+        function processData() {
+            state.data.sort((a, b) => a - b);
+            
+            // 构建直方图数据 (bins)
+            const numBins = 40;
+            const binWidth = 1.0 / numBins;
+            state.histogram = Array(numBins).fill(0).map((_, i) => ({
+                x: i * binWidth,
+                width: binWidth,
+                count: 0,
+                density: 0
+            }));
+
+            state.data.forEach(val => {
+                let binIdx = Math.floor(val / binWidth);
+                if (binIdx >= numBins) binIdx = numBins - 1;
+                state.histogram[binIdx].count++;
+            });
+
+            // 计算概率密度 (使得面积积分 = 1)
+            const N = state.data.length;
+            let maxDensity = 0;
+            state.histogram.forEach(bin => {
+                bin.density = bin.count / (N * binWidth);
+                if (bin.density > maxDensity) maxDensity = bin.density;
+            });
+
+            // 【新增】计算真实数据背后的理论最大密度（上帝视角）
+            let trueMaxDensity = 0;
+            if (state.trueParams && state.trueParams.length > 0) {
+                for (let x = 0; x <= 1; x += 0.01) {
+                    let d = 0;
+                    state.trueParams.forEach(p => {
+                        d += p.pi * gaussianPDF(x, p.mu, p.sigma);
+                    });
+                    if (d > trueMaxDensity) trueMaxDensity = d;
+                }
+            }
+
+            // 综合直方图和理论密度的最大值
+            let overallMax = Math.max(maxDensity, trueMaxDensity);
+
+            state.targetMaxY = overallMax * 1.15; // Y轴留出 15% 余量
+            if (state.targetMaxY < 1) state.targetMaxY = 1; // 確保少なくとも1にする
+            
+            // 直接同步当前的最大Y值，并永久锁定
+            state.currentMaxY = state.targetMaxY; 
+            
+            resetAlgorithm();
+        }
+
+        function resetAlgorithm() {
+            state.components = [];
+            state.responsibilities = [];
+            state.phase = 'IDLE';
+            state.iteration = 0;
+            state.logLikelihood = -Infinity;
+            llBadge.style.display = 'none';
+            stopAutoPlay();
+            updateUI();
+            draw();
+        }
+
+        // --- 高斯分布与EM算法核心 ---
+
+        function gaussianPDF(x, mu, sigma) {
+            if (sigma < 0.001) sigma = 0.001; // 防止除0
+            const coeff = 1.0 / (Math.sqrt(2 * Math.PI) * sigma);
+            const exponent = -0.5 * Math.pow((x - mu) / sigma, 2);
+            return coeff * Math.exp(exponent);
+        }
+
+        function initGMM() {
+            state.k = parseInt(sliderK.value);
+            state.components = [];
+            
+            // K-means++ 风格或均匀分割初始化 mu
+            for (let i = 0; i < state.k; i++) {
+                // 均匀散布均值
+                let initialMu = (i + 1) / (state.k + 1);
+                // 给一个足够宽的初始标准差，涵盖数据
+                let initialSigma = 0.2; 
+                let initialPi = 1.0 / state.k;
+
+                state.components.push({
+                    mu: initialMu,
+                    sigma: initialSigma,
+                    pi: initialPi,
+                    oldMu: initialMu,
+                    oldSigma: initialSigma,
+                    oldPi: initialPi,
+                    color: colors[i % colors.length]
+                });
+            }
+
+            // 初始化责任矩阵 (N x K)
+            state.responsibilities = Array(state.data.length).fill(0).map(() => Array(state.k).fill(0));
+
+            state.iteration = 1;
+            state.animProgress = 1;
+            state.phase = 'INIT';
+            updateUI();
+            draw();
+            
+            setTimeout(() => {
+                if (state.phase === 'INIT') {
+                    state.phase = 'E_STEP';
+                    updateUI();
+                }
+            }, 500);
+        }
+
+        // E-Step: 计算响应度 (Responsibilities)
+        function eStep() {
+            let logLikelihoodSum = 0;
+
+            for (let i = 0; i < state.data.length; i++) {
+                let x = state.data[i];
+                let px = 0;
+                let weightedPDFs = [];
+
+                // 计算每个成分的分子
+                for (let j = 0; j < state.k; j++) {
+                    let c = state.components[j];
+                    let wPdf = c.pi * gaussianPDF(x, c.mu, c.sigma);
+                    weightedPDFs.push(wPdf);
+                    px += wPdf;
+                }
+
+                logLikelihoodSum += Math.log(px + 1e-10); // 防止log(0)
+
+                // 归一化得到 gamma (响应度)
+                for (let j = 0; j < state.k; j++) {
+                    state.responsibilities[i][j] = (px === 0) ? 0 : (weightedPDFs[j] / px);
+                }
+            }
+
+            state.prevLogLikelihood = state.logLikelihood;
+            state.logLikelihood = logLikelihoodSum;
+
+            // E步只有颜色的瞬间变化，不需要平滑动画
+            state.animProgress = 1;
+            state.phase = 'M_STEP';
+            updateUI();
+            draw();
+        }
+
+        // M-Step: 更新模型参数
+        function mStep() {
+            const N = state.data.length;
+
+            state.components.forEach((c, j) => {
+                // 保存旧参数用于动画
+                c.oldMu = c.mu;
+                c.oldSigma = c.sigma;
+                c.oldPi = c.pi;
+
+                // 计算 Nk (该成分的有效数据点数)
+                let Nk = 0;
+                for (let i = 0; i < N; i++) {
+                    Nk += state.responsibilities[i][j];
+                }
+
+                if (Nk > 0) {
+                    // 更新均值 mu
+                    let newMu = 0;
+                    for (let i = 0; i < N; i++) {
+                        newMu += state.responsibilities[i][j] * state.data[i];
+                    }
+                    c.mu = newMu / Nk;
+
+                    // 更新标准差 sigma (方差的平方根)
+                    let newVar = 0;
+                    for (let i = 0; i < N; i++) {
+                        newVar += state.responsibilities[i][j] * Math.pow(state.data[i] - c.mu, 2);
+                    }
+                    c.sigma = Math.sqrt(newVar / Nk);
+                    if (c.sigma < 0.005) c.sigma = 0.005; // 限制最小方差防过拟合
+
+                    // 更新权重 pi
+                    c.pi = Nk / N;
+                }
+            });
+
+            // 【删除】：删除了 updateTargetMaxY(); 的调用，禁止 M步在迭代中改变 Y轴比例
+
+            // 触发 M 步曲线形变动画
+            state.animProgress = 0;
+            animateMStep();
+        }
+
+        // 【删除】：请将原代码中的 updateTargetMaxY() 函数定义整段彻底删除
+        
+        function animateMStep() {
+            const speedScale = parseInt(sliderSpeed.value); // 1 to 10
+            const step = 0.02 * (speedScale / 3);
+
+            state.animProgress += step;
+            if (state.animProgress >= 1) {
+                state.animProgress = 1;
+                state.iteration++;
+                
+                // 判断收敛：对数似然变化小于阈值
+                let llDiff = state.logLikelihood - state.prevLogLikelihood;
+                if (state.iteration > 2 && Math.abs(llDiff) < 0.001) {
+                    state.phase = 'CONVERGED';
+                    stopAutoPlay();
+                } else {
+                    state.phase = 'E_STEP';
+                }
+                
+                updateUI();
+                draw();
+                return;
+            }
+
+            draw();
+            requestAnimationFrame(animateMStep);
+        }
+
+        function doNextStep() {
+            if (state.phase === 'E_STEP') {
+                eStep();
+            } else if (state.phase === 'M_STEP') {
+                mStep();
+            }
+        }
+
+        // --- 渲染逻辑 ---
+
+        // 颜色混合辅助函数，用于数据点着色
+        function blendColors(responsibilities) {
+            let r=0, g=0, b=0;
+            for(let k=0; k<state.k; k++) {
+                let weight = responsibilities[k];
+                if (weight > 0) {
+                    let hex = state.components[k].color;
+                    r += parseInt(hex.slice(1, 3), 16) * weight;
+                    g += parseInt(hex.slice(3, 5), 16) * weight;
+                    b += parseInt(hex.slice(5, 7), 16) * weight;
+                }
+            }
+            return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+        }
+        function hexToRgba(hex, alpha) {
+            let r = parseInt(hex.slice(1, 3), 16),
+                g = parseInt(hex.slice(3, 5), 16),
+                b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        // 缓动函数
+        function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+        function draw() {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            
+            const w = canvas.offsetWidth;
+            const h = canvas.offsetHeight;
+            ctx.clearRect(0, 0, w, h);
+
+            // 平滑调整 Y 轴缩放
+            state.currentMaxY += (state.targetMaxY - state.currentMaxY) * 0.1;
+
+            const margin = { top: 30, bottom: 60, left: 50, right: 30 };
+            const drawW = w - margin.left - margin.right;
+            const drawH = h - margin.top - margin.bottom;
+
+            const getX = (val) => margin.left + val * drawW;
+            const getY = (val) => margin.top + drawH - (val / state.currentMaxY) * drawH;
+
+            // 1. 绘制网格与坐标系
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            // Y轴水平网格线
+            for (let i = 0; i <= Math.ceil(state.currentMaxY); i++) {
+                let py = getY(i);
+                if(py >= margin.top && py <= h - margin.bottom) {
+                    ctx.moveTo(margin.left, py);
+                    ctx.lineTo(w - margin.right, py);
+                }
+            }
+            ctx.stroke();
+
+            // 绘制底线 (X轴)
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(margin.left, getY(0));
+            ctx.lineTo(w - margin.right, getY(0));
+            ctx.stroke();
+
+            // Y轴文字说明
+            ctx.fillStyle = '#64748b';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText("確率密度", margin.left - 10, margin.top);
+
+            // 2. 绘制数据直方图
+            if (state.histogram.length > 0) {
+                state.histogram.forEach(bin => {
+                    let px = getX(bin.x);
+                    let pw = drawW * bin.width;
+                    let ph = drawH * (bin.density / state.currentMaxY);
+                    let py = getY(bin.density);
+
+                    ctx.fillStyle = 'rgba(203, 213, 225, 0.5)'; // 浅灰透明
+                    ctx.strokeStyle = 'rgba(203, 213, 225, 0.8)';
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(px, py, pw, ph);
+                    ctx.strokeRect(px, py, pw, ph);
+                });
+            }
+
+            // 3. 绘制底层数据点 (散布在 X 轴下方)
+            const dotY = h - margin.bottom + 20; // 放在X轴下方一点
+            if (state.data.length > 0) {
+                // 如果是 INIT 或 IDLE 状态，统一灰色
+                let useColors = (state.phase !== 'IDLE' && state.phase !== 'INIT' && state.responsibilities.length > 0);
+                
+                ctx.globalAlpha = 0.6;
+                for (let i = 0; i < state.data.length; i++) {
+                    let px = getX(state.data[i]);
+                    ctx.beginPath();
+                    // 加点随机纵向抖动防止重叠
+                    let jitter = (Math.sin(i * 123.45) * 8); 
+                    ctx.arc(px, dotY + jitter, 2.5, 0, Math.PI * 2);
+                    
+                    if (useColors) {
+                        ctx.fillStyle = blendColors(state.responsibilities[i]);
+                    } else {
+                        ctx.fillStyle = '#94a3b8';
+                    }
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            // 4. 绘制高斯曲线
+            if (state.components.length > 0 && state.phase !== 'IDLE') {
+                const pointsCount = 200; // 曲线采样点
+                let totalCurve = Array(pointsCount).fill(0);
+                
+                state.components.forEach((c, k) => {
+                    // 获取当前动画插值参数
+                    let progress = easeOutCubic(state.animProgress);
+                    let curMu = c.oldMu + (c.mu - c.oldMu) * progress;
+                    let curSigma = c.oldSigma + (c.sigma - c.oldSigma) * progress;
+                    let curPi = c.oldPi + (c.pi - c.oldPi) * progress;
+
+                    ctx.beginPath();
+                    for (let i = 0; i <= pointsCount; i++) {
+                        let vx = i / pointsCount;
+                        let vy = curPi * gaussianPDF(vx, curMu, curSigma);
+                        totalCurve[i] += vy; // 累加到总曲线
+
+                        let px = getX(vx);
+                        let py = getY(vy);
+                        if (i === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    
+                    // 填充区域
+                    ctx.lineTo(getX(1), getY(0));
+                    ctx.lineTo(getX(0), getY(0));
+                    ctx.fillStyle = hexToRgba(c.color, 0.15);
+                    ctx.fill();
+
+                    // 绘制边线
+                    ctx.beginPath();
+                    for (let i = 0; i <= pointsCount; i++) {
+                        let vx = i / pointsCount;
+                        let vy = curPi * gaussianPDF(vx, curMu, curSigma);
+                        let px = getX(vx);
+                        let py = getY(vy);
+                        if (i === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeStyle = c.color;
+                    ctx.stroke();
+
+                    // 标记均值位置
+                    ctx.beginPath();
+                    let topY = getY(curPi * gaussianPDF(curMu, curMu, curSigma));
+                    ctx.moveTo(getX(curMu), topY);
+                    ctx.lineTo(getX(curMu), getY(0));
+                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = hexToRgba(c.color, 0.8);
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                });
+
+                // 绘制总概率密度曲线 (混合曲线)
+                ctx.beginPath();
+                for (let i = 0; i <= pointsCount; i++) {
+                    let vx = i / pointsCount;
+                    let px = getX(vx);
+                    let py = getY(totalCurve[i]);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#1e293b'; // 黑灰色虚线
+                ctx.setLineDash([8, 6]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        // --- 交互与生命周期 ---
+
+        function updateUI() {
+            // 按钮状态
+            if (state.phase === 'IDLE' || state.phase === 'INIT' || state.phase === 'CONVERGED') {
+                btnStep.disabled = true;
+                btnPlay.disabled = true;
+            } else {
+                btnStep.disabled = state.animProgress < 1; 
+                btnPlay.disabled = false;
+            }
+
+            btnStep.textContent = state.phase === 'CONVERGED' ? '完了' : 'ステップ実行';
+            btnPlay.innerHTML = state.isPlaying ? '<span class="text-red-600">一時停止</span>' : '自動再生';
+
+            // 对数似然展示
+            if (state.logLikelihood !== -Infinity && !isNaN(state.logLikelihood)) {
+                llBadge.style.display = 'block';
+                llValue.textContent = (state.logLikelihood).toFixed(2);
+                // 用颜色提示似然的增加
+                if (state.logLikelihood > state.prevLogLikelihood + 0.01) {
+                    llValue.className = "text-green-600 font-bold transition-colors";
+                } else {
+                    llValue.className = "text-gray-700 transition-colors";
+                }
+            }
+
+            // 顶部状态标识
+            let badgeText = '';
+            let badgeColorClass = '';
+            
+            switch(state.phase) {
+                case 'IDLE': badgeText = '初期化待ち'; badgeColorClass = 'text-gray-600'; break;
+                case 'INIT': badgeText = '初期化完了'; badgeColorClass = 'text-violet-600'; break;
+                case 'E_STEP': badgeText = `反復 ${state.iteration}: Eステップ (期待値の計算)`; badgeColorClass = 'text-orange-600'; break;
+                case 'M_STEP': badgeText = `反復 ${state.iteration}: Mステップ (パラメータの最大化)`; badgeColorClass = 'text-blue-600'; break;
+                case 'CONVERGED': badgeText = `モデルが収束しました (合計 ${state.iteration} 回の反復)`; badgeColorClass = 'text-green-600'; break;
+            }
+            statusBadge.textContent = badgeText;
+            statusBadge.className = `absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded text-sm font-bold shadow-sm border border-gray-100 z-10 ${badgeColorClass}`;
+
+            // 右侧解释文本
+            switch(state.phase) {
+                case 'IDLE':
+                    infoTitle.textContent = "準備完了";
+                    infoTitle.className = "text-sm font-bold text-gray-800 mb-1";
+                    infoDesc.textContent = "データ量を調整し、K値を選択して初期化をクリックしてください。";
+                    break;
+                case 'INIT':
+                    infoTitle.textContent = "初期パラメータの設定完了";
+                    infoTitle.className = "text-sm font-bold text-violet-800 mb-1";
+                    infoDesc.textContent = `${state.k} 個の広い分散を持つ初期ガウス分布が均等に配置されました。下部の図は全体的な白黒の破線の混合密度を示しています。ステップ実行をクリックしてEステップに進みます。`;
+                    break;
+                case 'E_STEP':
+                    infoTitle.textContent = "Eステップ: データの帰属を評価 (ソフトクラスタリング)";
+                    infoTitle.className = "text-sm font-bold text-orange-800 mb-1";
+                    infoDesc.textContent = "ガウス分布を固定したまま、各データポイント（下部の散布図）が現在の各ガウス分布から生成される確率を計算します。散布図の色が混ざり合い、それらが部分的に異なるクラスターに属していることがわかります。";
+                    break;
+                case 'M_STEP':
+                    infoTitle.textContent = "Mステップ: ガウス曲線の更新";
+                    infoTitle.className = "text-sm font-bold text-blue-800 mb-1";
+                    infoDesc.textContent = "前のステップで計算された確率の重みを使用して、各ガウス分布の平均、分散、および全体の重みを再計算します。曲線は、担当するデータ領域により良く適合する（覆う）ように滑らかに移動します。";
+                    break;
+                case 'CONVERGED':
+                    infoTitle.textContent = "EM アルゴリズムが収束しました 🎉";
+                    infoTitle.className = "text-sm font-bold text-green-800 mb-1";
+                    infoDesc.textContent = "複数回の反復を経て、モデルの対数尤度 (Log-likelihood) の有意な向上は見られなくなりました。黒い破線（混合モデル）は、現在の条件下でデータのヒストグラム形状に最も適合する分布を見つけました！";
+                    break;
+            }
+        }
+
+        function toggleAutoPlay() {
+            state.isPlaying = !state.isPlaying;
+            if (state.isPlaying) runAutoPlayLoop();
+            else stopAutoPlay();
+            updateUI();
+        }
+
+        function stopAutoPlay() {
+            state.isPlaying = false;
+            if (state.playTimer) {
+                clearTimeout(state.playTimer);
+                state.playTimer = null;
+            }
+        }
+
+        function runAutoPlayLoop() {
+            if (!state.isPlaying) return;
+            if (state.phase === 'CONVERGED') {
+                stopAutoPlay();
+                updateUI();
+                return;
+            }
+
+            if (state.animProgress >= 1) {
+                doNextStep();
+            }
+
+            const speed = parseInt(sliderSpeed.value); 
+            let delay = 1500 - (speed * 130); 
+            if (delay < 50) delay = 50;
+            
+            // 动画中降低延迟
+            if (state.phase === 'M_STEP' && state.animProgress < 1) {
+                delay = 50; 
+            }
+
+            state.playTimer = setTimeout(runAutoPlayLoop, delay);
+        }
+
+        // --- イベントリスナー ---
+        sliderPoints.addEventListener('input', (e) => {
+            labelPoints.textContent = e.target.value;
+            generateMultiModalData(parseInt(e.target.value));
+        });
+
+        sliderK.addEventListener('input', (e) => {
+            labelK.textContent = e.target.value;
+            resetAlgorithm();
+        });
+
+        btnInit.addEventListener('click', () => { initGMM(); });
+        btnStep.addEventListener('click', () => { stopAutoPlay(); doNextStep(); });
+        btnPlay.addEventListener('click', () => { toggleAutoPlay(); });
+
+        sliderSpeed.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            const label = document.getElementById('speed-label');
+            if (val <= 3) label.textContent = '遅い';
+            else if (val <= 7) label.textContent = '普通';
+            else label.textContent = '速い';
+        });
+
+        window.addEventListener('resize', () => { draw(); });
+
+        // 初期デフォルトデータ
+        generateMultiModalData(parseInt(sliderPoints.value));
+
+    </script>
+</body>
+</html>

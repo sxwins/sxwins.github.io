@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主成分分析 (PCA) の可視化</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .table-container { max-height: 40vh; overflow-y: auto; overflow-x: auto; }
+        th { position: sticky; top: 0; background: #2563eb; color: white; z-index: 10; }
+        td:first-child { position: sticky; left: 0; background: #f8fafc; font-weight: bold; z-index: 5; border-right: 1px solid #e2e8f0; }
+        th:first-child { z-index: 15; left: 0; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded bg-blue-600 text-white flex items-center justify-center font-bold text-lg">P</div>
+            <h1 class="text-xl font-bold text-gray-800">主成分分析 (PCA) の可視化</h1>
+        </div>
+        <div class="text-sm text-gray-500">
+            高次元データ(成績表)から低次元(2D)への射影プロセス
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 flex gap-4 p-4 min-h-0 overflow-hidden">
+        
+        <!-- 左側：データとプロット領域 -->
+        <div class="flex-1 flex flex-col gap-4 min-w-0">
+            
+            <!-- 上部：データテーブル (高次元) -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col relative h-2/5 shrink-0">
+                <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 font-semibold text-sm text-gray-700 flex justify-between items-center">
+                    <span>D次元データ (元の高次元データ)</span>
+                    <span class="text-xs font-normal text-gray-500">N人 × D科目</span>
+                </div>
+                <div class="table-container flex-1">
+                    <table class="w-full text-sm text-center border-collapse" id="data-table">
+                        <thead>
+                            <tr id="table-head">
+                                <!-- JSで動的に生成 -->
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- JSで動的に生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 下部：散布図 (低次元) -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 relative overflow-hidden flex flex-col">
+                <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 shadow-sm border border-gray-100 z-10" id="status-badge">
+                    データを生成してください
+                </div>
+                <div class="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg text-sm font-mono text-gray-600 shadow-sm border border-gray-100 z-10 flex gap-4" id="variance-badge" style="display: none;">
+                    <span>寄与率: <span id="var-pc1" class="text-blue-600 font-bold">--%</span> (PC1)</span>
+                    <span><span id="var-pc2" class="text-green-600 font-bold">--%</span> (PC2)</span>
+                </div>
+                <canvas id="pca-canvas" class="flex-1 w-full h-full"></canvas>
+            </div>
+        </div>
+
+        <!-- 右側：コントロールパネル -->
+        <aside class="w-80 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col shrink-0 overflow-hidden">
+            <div class="p-4 border-b border-gray-100 bg-gray-50 font-semibold text-gray-700">
+                コントロールパネル
+            </div>
+            
+            <div class="p-5 overflow-y-auto flex-1 flex flex-col gap-6">
+                
+                <!-- 1. データ生成 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">1. データの準備</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <label>学生数 (N)</label>
+                            <span id="n-count-label">30人</span>
+                        </div>
+                        <input type="range" id="n-count" min="10" max="100" value="30" class="w-full accent-blue-600">
+                    </div>
+                    <button id="btn-gen-data" class="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded transition-colors border border-gray-200">
+                        成績データを再生成
+                    </button>
+                    
+                    <div class="relative mt-3 mb-1">
+                        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div class="w-full border-t border-gray-200"></div>
+                        </div>
+                        <div class="relative flex justify-center">
+                            <span class="bg-white px-2 text-xs text-gray-400">または</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="csv-upload" class="w-full px-3 py-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 text-sm font-medium rounded transition-colors cursor-pointer flex justify-center items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                            CSVを読み込む
+                        </label>
+                        <input type="file" id="csv-upload" accept=".csv" class="hidden">
+                        <p class="text-[10px] text-gray-400 mt-1.5 leading-tight">
+                            ※ 1行目はヘッダー(列名)、1列目は名前(文字列)、2列目以降は数値としてください。<br>
+                            ※ 尺度は既に調整済(正規化等)であると仮定して分析します。
+                        </p>
+                    </div>
+                </section>
+
+                <hr class="border-gray-100">
+
+                <!-- 2. 分析実行 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">2. 主成分分析の実行</h3>
+                    
+                    <button id="btn-step" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                        PCA ステップ実行
+                    </button>
+                    
+                    <!-- 進行状況インジケーター -->
+                    <div class="space-y-2 mt-4 text-sm relative before:absolute before:inset-y-0 before:left-[11px] before:w-[2px] before:bg-gray-200" id="steps-container">
+                        <div class="flex gap-3 relative" id="step-0">
+                            <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 z-10 text-xs font-bold shadow ring-4 ring-white">1</div>
+                            <div class="pt-1"><p class="font-medium text-gray-800">データの中心化</p><p class="text-xs text-gray-500 mt-0.5">平均を0に合わせる</p></div>
+                        </div>
+                        <div class="flex gap-3 relative opacity-40 grayscale" id="step-1">
+                            <div class="w-6 h-6 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center shrink-0 z-10 text-xs font-bold shadow ring-4 ring-white">2</div>
+                            <div class="pt-1"><p class="font-medium text-gray-800">分散共分散行列</p><p class="text-xs text-gray-500 mt-0.5">変数間の相関を計算</p></div>
+                        </div>
+                        <div class="flex gap-3 relative opacity-40 grayscale" id="step-2">
+                            <div class="w-6 h-6 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center shrink-0 z-10 text-xs font-bold shadow ring-4 ring-white">3</div>
+                            <div class="pt-1"><p class="font-medium text-gray-800">固有値分解</p><p class="text-xs text-gray-500 mt-0.5">主成分の方向を抽出</p></div>
+                        </div>
+                        <div class="flex gap-3 relative opacity-40 grayscale" id="step-3">
+                            <div class="w-6 h-6 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center shrink-0 z-10 text-xs font-bold shadow ring-4 ring-white">4</div>
+                            <div class="pt-1"><p class="font-medium text-gray-800">低次元への射影</p><p class="text-xs text-gray-500 mt-0.5">2D平面へのマッピング</p></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 解説カード -->
+                <div class="mt-auto bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <h4 class="text-sm font-bold text-blue-800 mb-1" id="info-title">データ準備完了</h4>
+                    <p class="text-xs text-blue-700 leading-relaxed" id="info-desc">
+                        左上の表は、各学生の科目ごとの成績です。PCAを実行して、この高次元データを人間が見やすい2次元のグラフに変換しましょう。
+                    </p>
+                </div>
+
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        /**
+         * PCA (主成分分析) アルゴリズムと可視化ロジック
+         */
+
+        const SURNAMES = ["田中", "山田", "伊東", "横山", "里中", "佐藤", "鈴木", "高橋", "渡辺", "伊藤", "山本", "中村", "小林", "加藤", "吉田", "松本", "井上", "木村", "林", "斎藤"];
+        let SUBJECTS = ["国語", "算数", "英語", "理科", "社会"];
+        
+        // 状態管理
+        const state = {
+            data: [],         // 元データ [{name: "田中", values: [100, 50, 68, 70, 80]}, ...]
+            centered: [],     // 中心化されたデータ
+            means: [],        // 各科目の平均
+            covariance: [],   // 共分散行列
+            eigenvalues: [],  // 固有値
+            eigenvectors: [], // 固有ベクトル
+            projected: [],    // 2Dに射影されたデータ [{name: "田中", x: ..., y: ...}]
+            
+            phase: 'IDLE',    // IDLE, CENTERED, COVARIANCE, EIGEN, PROJECTED
+            stepIndex: 0,
+            animProgress: 0,
+
+            // 缩放与平移状态
+            panX: 0,
+            panY: 0,
+            zoom: 1,
+            isDragging: false,
+            lastMouseX: 0,
+            lastMouseY: 0
+        };
+
+        // DOM参照
+        const tableHead = document.getElementById('table-head');
+        const tableBody = document.getElementById('table-body');
+        const canvas = document.getElementById('pca-canvas');
+        const ctx = canvas.getContext('2d');
+        const btnGenData = document.getElementById('btn-gen-data');
+        const btnStep = document.getElementById('btn-step');
+        const sliderN = document.getElementById('n-count');
+        const labelN = document.getElementById('n-count-label');
+        const statusBadge = document.getElementById('status-badge');
+        const infoTitle = document.getElementById('info-title');
+        const infoDesc = document.getElementById('info-desc');
+        const varianceBadge = document.getElementById('variance-badge');
+        const csvUpload = document.getElementById('csv-upload');
+
+        // --- データ生成 ---
+        
+        // 正規分布の乱数生成 (Box-Muller)
+        function randomGaussian(mu = 0, sigma = 1) {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * sigma + mu;
+        }
+
+        function generateData() {
+            const N = parseInt(sliderN.value);
+            state.data = [];
+            
+            // データを面白くするため、2つの隠れた「タイプ」を作る
+            // 1: 文系タイプ (国語・英語・社会が高い)
+            // 2: 理系タイプ (算数・理科が高い)
+            
+            for (let i = 0; i < N; i++) {
+                const name = SURNAMES[Math.floor(Math.random() * SURNAMES.length)] + (i+1);
+                const type = Math.random() > 0.5 ? 'humanities' : 'science';
+                
+                let scores = [];
+                if (type === 'humanities') {
+                    scores = [
+                        randomGaussian(80, 10), // 国語
+                        randomGaussian(50, 15), // 算数
+                        randomGaussian(75, 12), // 英語
+                        randomGaussian(55, 15), // 理科
+                        randomGaussian(85, 10)  // 社会
+                    ];
+                } else {
+                    scores = [
+                        randomGaussian(50, 15), // 国語
+                        randomGaussian(85, 10), // 算数
+                        randomGaussian(55, 15), // 英語
+                        randomGaussian(80, 10), // 理科
+                        randomGaussian(60, 15)  // 社会
+                    ];
+                }
+                
+                // 0-100に収める
+                scores = scores.map(s => Math.round(Math.max(0, Math.min(100, s))));
+                
+                state.data.push({
+                    name: name,
+                    values: scores,
+                    type: type // 描画時の色分け用に保持
+                });
+            }
+            
+            resetPCA();
+            renderTable();
+            draw();
+        }
+
+        function renderTable() {
+            // ヘッダー
+            tableHead.innerHTML = `<th>名前</th>` + SUBJECTS.map(sub => `<th>${sub}</th>`).join('');
+            
+            // ボディ
+            tableBody.innerHTML = state.data.map(row => {
+                const colorClass = row.type === 'humanities' ? 'text-red-600 bg-red-50/30' : 
+                                   row.type === 'science' ? 'text-blue-600 bg-blue-50/30' :
+                                   'text-emerald-700 bg-emerald-50/30'; // カスタムデータの色
+                return `<tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <td class="px-3 py-2 whitespace-nowrap ${colorClass}">${row.name}</td>
+                    ${row.values.map(val => `<td class="px-3 py-2">${val}</td>`).join('')}
+                </tr>`;
+            }).join('');
+        }
+
+        function resetPCA() {
+            state.phase = 'IDLE';
+            state.stepIndex = 0;
+            state.centered = [];
+            state.projected = [];
+            state.panX = 0;
+            state.panY = 0;
+            state.zoom = 1;
+            varianceBadge.style.display = 'none';
+            updateUI();
+        }
+
+        // --- PCA 計算アルゴリズム ---
+
+        function computePCA() {
+            const D = SUBJECTS.length;
+            const N = state.data.length;
+
+            // 1. 平均を求めて中心化
+            state.means = Array(D).fill(0);
+            for (let i = 0; i < N; i++) {
+                for (let j = 0; j < D; j++) state.means[j] += state.data[i].values[j];
+            }
+            for (let j = 0; j < D; j++) state.means[j] /= N;
+
+            state.centered = state.data.map(row => ({
+                name: row.name,
+                type: row.type,
+                values: row.values.map((v, j) => v - state.means[j])
+            }));
+
+            // 2. 共分散行列の計算 (D x D)
+            state.covariance = Array(D).fill(0).map(() => Array(D).fill(0));
+            for (let i = 0; i < D; i++) {
+                for (let j = 0; j < D; j++) {
+                    let sum = 0;
+                    for (let n = 0; n < N; n++) {
+                        sum += state.centered[n].values[i] * state.centered[n].values[j];
+                    }
+                    state.covariance[i][j] = sum / (N - 1);
+                }
+            }
+
+            // 3. 固有値分解 (Jacobi法)
+            const { eigenvalues, eigenvectors } = jacobi(state.covariance);
+            state.eigenvalues = eigenvalues;
+            state.eigenvectors = eigenvectors; // 各要素は列ベクトル配列
+
+            // 4. 第一主成分、第二主成分への射影
+            state.projected = state.centered.map(row => {
+                // v * Eigenvector1
+                let pc1 = row.values.reduce((sum, val, j) => sum + val * eigenvectors[0][j], 0);
+                // v * Eigenvector2
+                let pc2 = row.values.reduce((sum, val, j) => sum + val * eigenvectors[1][j], 0);
+                return {
+                    name: row.name,
+                    type: row.type,
+                    x: pc1,
+                    y: pc2
+                };
+            });
+        }
+
+        // CSV パーサー
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            if (lines.length < 2) {
+                alert("エラー：有効なデータ行が見つかりません。");
+                return;
+            }
+
+            // ヘッダーの解析
+            const header = lines[0].split(',').map(s => s.trim());
+            if (header.length < 2) {
+                alert("エラー：列が不足しています。1行目はヘッダー、1列目は名前、2列目以降は数値にしてください。");
+                return;
+            }
+
+            SUBJECTS = header.slice(1);
+            state.data = [];
+
+            // データの解析
+            for (let i = 1; i < lines.length; i++) {
+                // 空行やカンマのみの行をスキップ
+                if (!lines[i].trim() || lines[i].trim() === ',') continue;
+                
+                const cols = lines[i].split(',').map(s => s.trim());
+                if (cols.length === 0) continue;
+
+                const name = cols[0] || `Unknown${i}`;
+                const values = [];
+                // ヘッダーの列数に合わせて読み込む
+                for (let j = 1; j < header.length; j++) {
+                    const val = parseFloat(cols[j]);
+                    values.push(isNaN(val) ? 0 : val);
+                }
+
+                state.data.push({
+                    name: name,
+                    values: values,
+                    type: 'custom' // カスタムデータフラグ
+                });
+            }
+
+            resetPCA();
+            renderTable();
+            draw();
+            
+            // 完了通知をUIに反映
+            statusBadge.textContent = 'カスタムデータをロードしました';
+            infoTitle.textContent = "カスタムデータの準備完了";
+            infoDesc.textContent = `${state.data.length}行、${SUBJECTS.length}次元のCSVデータを読み込みました。「PCA ステップ実行」をクリックして分析を開始してください。`;
+        }
+
+        // ヤコビ法による対称行列の固有値分解
+        function jacobi(A) {
+            let n = A.length;
+            let V = Array(n).fill(0).map((_, i) => Array(n).fill(0).map((_, j) => i === j ? 1 : 0));
+            let D = A.map(row => [...row]); // コピー
+
+            for (let iter = 0; iter < 100; iter++) {
+                let p = 0, q = 1, maxVal = Math.abs(D[0][1]);
+                for (let i = 0; i < n; i++) {
+                    for (let j = i + 1; j < n; j++) {
+                        if (Math.abs(D[i][j]) > maxVal) {
+                            maxVal = Math.abs(D[i][j]);
+                            p = i; q = j;
+                        }
+                    }
+                }
+                if (maxVal < 1e-9) break;
+
+                let diff = D[q][q] - D[p][p];
+                let phi;
+                if (Math.abs(diff) < 1e-9) phi = Math.PI / 4 * Math.sign(D[p][q]);
+                else phi = 0.5 * Math.atan2(2 * D[p][q], diff);
+
+                let c = Math.cos(phi), s = Math.sin(phi);
+
+                // Update D and V
+                for (let i = 0; i < n; i++) {
+                    if (i !== p && i !== q) {
+                        let dip = D[i][p], diq = D[i][q];
+                        D[i][p] = D[p][i] = c * dip - s * diq;
+                        D[i][q] = D[q][i] = s * dip + c * diq;
+                    }
+                    let vip = V[i][p], viq = V[i][q];
+                    V[i][p] = c * vip - s * viq;
+                    V[i][q] = s * vip + c * viq;
+                }
+                let dpp = D[p][p], dqq = D[q][q], dpq = D[p][q];
+                D[p][p] = c*c*dpp - 2*s*c*dpq + s*s*dqq;
+                D[q][q] = s*s*dpp + 2*s*c*dpq + c*c*dqq;
+                D[p][q] = D[q][p] = 0;
+            }
+
+            // ペアにしてソート
+            let eigenPairs = [];
+            for (let i = 0; i < n; i++) {
+                // Vの列iを取り出す
+                eigenPairs.push({ val: D[i][i], vec: V.map(row => row[i]) });
+            }
+            eigenPairs.sort((a, b) => b.val - a.val); // 降順
+
+            return {
+                eigenvalues: eigenPairs.map(p => p.val),
+                eigenvectors: eigenPairs.map(p => p.vec)
+            };
+        }
+
+        // --- ステップ実行とUI ---
+
+        function doNextStep() {
+            if (state.stepIndex === 0) {
+                // 事前計算をすべてやっておく
+                computePCA();
+            }
+
+            state.stepIndex++;
+            
+            if (state.stepIndex === 1) state.phase = 'CENTERED';
+            else if (state.stepIndex === 2) state.phase = 'COVARIANCE';
+            else if (state.stepIndex === 3) state.phase = 'EIGEN';
+            else if (state.stepIndex === 4) {
+                state.phase = 'PROJECTED';
+                // アニメーション開始
+                state.animProgress = 0;
+                animateProjection();
+            }
+
+            updateUI();
+            if (state.phase !== 'PROJECTED') draw(); // 射影以外は即時描画
+        }
+
+        function animateProjection() {
+            state.animProgress += 0.03;
+            if (state.animProgress >= 1) {
+                state.animProgress = 1;
+                draw();
+                return;
+            }
+            draw();
+            requestAnimationFrame(animateProjection);
+        }
+
+        function updateUI() {
+            // ステップUIのハイライト更新
+            for (let i = 0; i < 4; i++) {
+                const el = document.getElementById(`step-${i}`);
+                if (i < state.stepIndex) {
+                    el.classList.remove('opacity-40', 'grayscale');
+                    el.querySelector('div').classList.replace('bg-gray-300', 'bg-blue-600');
+                    el.querySelector('div').classList.replace('text-gray-600', 'text-white');
+                } else {
+                    el.classList.add('opacity-40', 'grayscale');
+                    el.querySelector('div').classList.replace('bg-blue-600', 'bg-gray-300');
+                    el.querySelector('div').classList.replace('text-white', 'text-gray-600');
+                }
+            }
+
+            // ボタンテキスト
+            if (state.stepIndex >= 4) {
+                btnStep.textContent = "完了 (再実行はデータを生成)";
+                btnStep.disabled = true;
+                btnStep.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btnStep.textContent = `ステップ ${state.stepIndex + 1} を実行`;
+                btnStep.disabled = false;
+                btnStep.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            // 鼠标指针样式更新 (仅在投影完成后允许拖拽)
+            if (state.phase === 'PROJECTED') {
+                canvas.style.cursor = state.isDragging ? 'grabbing' : 'grab';
+            } else {
+                canvas.style.cursor = 'default';
+            }
+
+            // バッジと解説
+            switch(state.phase) {
+                case 'IDLE':
+                    statusBadge.textContent = '元のD次元データ (散布不可)';
+                    infoTitle.textContent = "ステップ1：中心化";
+                    infoDesc.textContent = "PCAの最初のステップは、全科目の平均点が0になるようにデータを平行移動（中心化）することです。";
+                    break;
+                case 'CENTERED':
+                    statusBadge.textContent = '1. データの中心化完了';
+                    infoTitle.textContent = "ステップ2：分散共分散行列";
+                    infoDesc.textContent = "次に、科目同士の関連性（例えば「国語が高い人は社会も高い傾向があるか」など）を表す共分散行列を計算します。";
+                    break;
+                case 'COVARIANCE':
+                    statusBadge.textContent = '2. 分散共分散行列を計算済';
+                    infoTitle.textContent = "ステップ3：固有値分解";
+                    infoDesc.textContent = "共分散行列に対して「固有値分解」という数学的操作を行い、データが最もばらついている新しい軸（主成分）を見つけ出します。";
+                    break;
+                case 'EIGEN':
+                    statusBadge.textContent = '3. 主成分の方向(固有ベクトル)を抽出済';
+                    infoTitle.textContent = "ステップ4：低次元への射影";
+                    infoDesc.textContent = "最も重要な上位2つの主成分を新しいX軸・Y軸として採用し、各学生の成績をその2D平面にプロット（射影）します！";
+                    break;
+                case 'PROJECTED':
+                    statusBadge.textContent = '4. 第1・第2主成分による2D散布図 (スクロールで拡大/ドラッグで移動)';
+                    statusBadge.className = 'absolute top-4 left-4 bg-blue-100/90 text-blue-800 backdrop-blur px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm border border-blue-200 z-10';
+                    infoTitle.textContent = "主成分分析 完了 🎉";
+                    infoDesc.textContent = "赤色は文系タイプ、青色は理系タイプとして生成された学生です。PCAが科目間の相関を自動的に読み取り、特徴的なクラスターを見事に2次元上に分離していることがわかります。マウスホイールでズーム、ドラッグで移動が可能です。";
+                    
+                    // 寄与率の表示
+                    let totalVar = state.eigenvalues.reduce((a,b)=>a+b,0);
+                    let p1 = (state.eigenvalues[0]/totalVar * 100).toFixed(1);
+                    let p2 = (state.eigenvalues[1]/totalVar * 100).toFixed(1);
+                    document.getElementById('var-pc1').textContent = `${p1}%`;
+                    document.getElementById('var-pc2').textContent = `${p2}%`;
+                    varianceBadge.style.display = 'flex';
+                    break;
+            }
+        }
+
+        // --- 描画ロジック ---
+
+        function draw() {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            
+            const w = canvas.offsetWidth;
+            const h = canvas.offsetHeight;
+            ctx.clearRect(0, 0, w, h);
+
+            if (state.phase === 'IDLE' || state.phase === 'CENTERED' || state.phase === 'COVARIANCE' || state.phase === 'EIGEN') {
+                // 射影前は図を描画しない、プレースホルダーのみ
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText("計算プロセス進行中...（データはまだ高次元空間にあります）", w/2, h/2);
+                return;
+            }
+
+            if (state.phase === 'PROJECTED') {
+                const margin = 60;
+                const drawW = w - margin * 2;
+                const drawH = h - margin * 2;
+
+                // データの最小最大を見つける (スケーリング用)
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                state.projected.forEach(p => {
+                    if(p.x < minX) minX = p.x; if(p.x > maxX) maxX = p.x;
+                    if(p.y < minY) minY = p.y; if(p.y > maxY) maxY = p.y;
+                });
+                
+                // Axis equal を維持するための計算
+                const rangeX = maxX - minX;
+                const rangeY = maxY - minY;
+                const maxRange = Math.max(rangeX, rangeY, 0.001) * 1.2; // 20%余白
+                
+                const cx = (minX + maxX) / 2;
+                const cy = (minY + maxY) / 2;
+
+                // 引入缩放和平移的坐标转换函数
+                const baseMapX = (val) => margin + drawW/2 + ((val - cx) / maxRange) * Math.min(drawW, drawH);
+                const baseMapY = (val) => margin + drawH/2 - ((val - cy) / maxRange) * Math.min(drawW, drawH); // Y反転
+
+                const getX = (val) => (baseMapX(val) - w/2) * state.zoom + w/2 + state.panX;
+                const getY = (val) => (baseMapY(val) - h/2) * state.zoom + h/2 + state.panY;
+
+                // 1. 軸の描画 (贯穿整个画布的十字坐标轴)
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, getY(0));
+                ctx.lineTo(w, getY(0));
+                ctx.moveTo(getX(0), 0);
+                ctx.lineTo(getX(0), h);
+                ctx.stroke();
+
+                // 绘制坐标轴文字，并确保平移时文字吸附在边缘可见区域
+                ctx.fillStyle = '#64748b';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText("第1主成分 (PC1) ➔", w - 20, Math.max(20, Math.min(h - 20, getY(0) - 10)));
+                ctx.textAlign = 'left';
+                ctx.fillText("第2主成分 (PC2) ➔", Math.max(20, Math.min(w - 120, getX(0) + 10)), 20);
+
+                // アニメーション用のイージング
+                const ease = 1 - Math.pow(1 - state.animProgress, 3);
+
+                // 2. データ点の描画 (投影矢量绘制已被移除)
+                state.projected.forEach(p => {
+                    // アニメーション中は原点から広がる
+                    let curX = 0 + p.x * ease;
+                    let curY = 0 + p.y * ease;
+                    
+                    let px = getX(curX);
+                    let py = getY(curY);
+
+                    // 点の描画
+                    ctx.beginPath();
+                    ctx.arc(px, py, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = p.type === 'humanities' ? 'rgba(220, 38, 38, 0.7)' : 
+                                    p.type === 'science' ? 'rgba(37, 99, 235, 0.7)' : 
+                                    'rgba(16, 185, 129, 0.7)'; // カスタムデータ用エメラルドグリーン
+                    ctx.fill();
+
+                    // 名前の描画
+                    if (state.animProgress > 0.8) {
+                        ctx.globalAlpha = (state.animProgress - 0.8) * 5;
+                        ctx.fillStyle = '#334155';
+                        ctx.font = '11px sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(p.name, px + 8, py);
+                        ctx.globalAlpha = 1.0;
+                    }
+                });
+            }
+        }
+
+        // --- イベントリスナー ---
+        sliderN.addEventListener('input', (e) => {
+            labelN.textContent = `${e.target.value}人`;
+        });
+
+        btnGenData.addEventListener('click', () => {
+            generateData();
+        });
+
+        csvUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                parseCSV(event.target.result);
+            };
+            reader.readAsText(file);
+            e.target.value = ''; // 同じファイルを再度選べるようにリセット
+        });
+
+        btnStep.addEventListener('click', () => {
+            doNextStep();
+        });
+
+        window.addEventListener('resize', () => {
+            draw();
+        });
+
+        // --- 画布缩放与平移事件监听 ---
+        canvas.addEventListener('mousedown', (e) => {
+            if (state.phase !== 'PROJECTED') return;
+            state.isDragging = true;
+            state.lastMouseX = e.offsetX;
+            state.lastMouseY = e.offsetY;
+            updateUI(); // 更新光标状态
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (state.phase !== 'PROJECTED' || !state.isDragging) return;
+            state.panX += e.offsetX - state.lastMouseX;
+            state.panY += e.offsetY - state.lastMouseY;
+            state.lastMouseX = e.offsetX;
+            state.lastMouseY = e.offsetY;
+            draw();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (state.isDragging) {
+                state.isDragging = false;
+                updateUI();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            if (state.isDragging) {
+                state.isDragging = false;
+                updateUI();
+            }
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            if (state.phase !== 'PROJECTED') return;
+            e.preventDefault(); // 防止页面滚动
+            
+            const zoomFactor = 1.1;
+            const oldZoom = state.zoom;
+            
+            // 计算新的缩放比例
+            if (e.deltaY < 0) {
+                state.zoom *= zoomFactor;
+            } else {
+                state.zoom /= zoomFactor;
+            }
+            state.zoom = Math.max(0.1, Math.min(state.zoom, 50)); // 限制最小与最大缩放
+            
+            // 以鼠标当前位置为中心进行缩放
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const w = canvas.offsetWidth;
+            const h = canvas.offsetHeight;
+            
+            const dx = mouseX - w/2;
+            const dy = mouseY - h/2;
+            
+            // 补偿平移，使画面向鼠标位置收缩/扩张
+            state.panX = dx - (dx - state.panX) * (state.zoom / oldZoom);
+            state.panY = dy - (dy - state.panY) * (state.zoom / oldZoom);
+            
+            draw();
+        }, { passive: false });
+
+        // 初期化
+        generateData();
+
+    </script>
+</body>
+</html>

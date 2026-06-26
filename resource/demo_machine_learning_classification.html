@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マルチモデルデータ分類器</title>
+  <!-- Tailwind CSS for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-800 min-h-screen p-6">
+
+  <div class="max-w-6xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+        <i class="fa-solid fa-chart-line text-blue-600"></i>
+        マルチモデルデータ分類器 (ローカル実行)
+      </h1>
+      <p class="text-slate-500 mt-2 text-sm">
+        想定されるデータ形式：1行目はフィールド名。1列目は文字列による説明、中間は数値特徴量（スケーリング済み）、最後の列はカテゴリラベル（整数）です。
+      </p>
+    </div>
+
+    <!-- Error Alert -->
+    <div id="errorAlert" class="hidden bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-center gap-2">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="errorMessage"></span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Left Panel: Training -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6 flex flex-col">
+        <div class="border-b pb-4">
+          <h2 class="text-lg font-semibold flex items-center gap-2">
+            <span class="bg-blue-100 text-blue-700 w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
+            アルゴリズムとトレーニングセットの選択
+          </h2>
+        </div>
+
+        <!-- Algorithm Config -->
+        <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-sliders"></i> 分類器アルゴリズムの選択
+            </label>
+            <select id="algoSelect" class="w-full border border-slate-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="RandomForest">ランダムフォレスト (Random Forest)</option>
+              <option value="SVM">サポートベクターマシン (Linear SVM)</option>
+              <option value="MLP">多層パーセプトロン (MLP - 単一隠れ層)</option>
+            </select>
+          </div>
+          
+          <!-- MLP Config (Hidden by default) -->
+          <div id="mlpConfig" class="hidden grid-cols-2 gap-4 mt-2">
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">隠れ層のノード数</label>
+              <input type="number" id="mlpNodes" min="1" max="1024" value="16" class="w-full border border-slate-300 rounded-md py-1.5 px-3 focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Epochs (エポック数)</label>
+              <input type="number" id="mlpEpochs" min="1" max="10000" value="10" class="w-full border border-slate-300 rounded-md py-1.5 px-3 focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- Train Upload -->
+        <div>
+          <div class="relative border-2 border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition text-center cursor-pointer">
+            <input type="file" id="trainFileInput" accept=".csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <i class="fa-solid fa-database mx-auto text-3xl text-slate-400 mb-2"></i>
+            <div id="trainFileLabel" class="text-sm text-slate-600">
+              クリックまたはドラッグして トレーニングセット (CSV) をアップロード
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Info Display -->
+        <div id="dataInfoDisplay" class="hidden text-sm bg-blue-50/50 p-4 rounded-lg border border-blue-100 text-slate-600 space-y-1">
+          <p><span class="font-semibold text-slate-800">テキスト列:</span> <span id="infoTextCol"></span></p>
+          <p><span class="font-semibold text-slate-800">特徴量列 (<span id="infoFeatureCount"></span>個):</span> <span id="infoFeatureCols"></span></p>
+          <p><span class="font-semibold text-slate-800">カテゴリラベル列:</span> <span class="text-blue-700 font-bold" id="infoTargetCol"></span></p>
+        </div>
+
+        <button id="trainBtn" disabled class="w-full mt-auto py-3 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition bg-blue-300 cursor-not-allowed">
+          <i class="fa-solid fa-play"></i> トレーニング開始
+        </button>
+
+        <!-- Train Result -->
+        <div id="trainResult" class="hidden bg-green-50 border border-green-200 p-4 rounded-lg flex items-start gap-3 mt-4">
+          <i class="fa-solid fa-circle-check shrink-0 mt-0.5 text-green-600"></i>
+          <div>
+            <h4 class="font-bold text-green-800">トレーニング完了</h4>
+            <div class="text-sm mt-1 text-green-700 space-y-0.5">
+              <p>所要時間: <b id="trainTimeSpan"></b></p>
+              <p>トレーニングセット精度 (Accuracy): <b class="text-lg" id="trainAccSpan"></b></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Testing -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6 flex flex-col">
+        <div class="border-b pb-4">
+          <h2 class="text-lg font-semibold flex items-center gap-2">
+            <span class="bg-blue-100 text-blue-700 w-6 h-6 rounded-full flex items-center justify-center text-sm">2</span>
+            モデルのテストと結果
+          </h2>
+        </div>
+
+        <div id="testUploadWrapper" class="opacity-50 pointer-events-none">
+          <div class="relative border-2 border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition text-center">
+            <input type="file" id="testFileInput" accept=".csv" disabled class="absolute inset-0 w-full h-full opacity-0 cursor-not-allowed">
+            <i class="fa-solid fa-file-circle-check mx-auto text-3xl text-slate-400 mb-2"></i>
+            <div id="testFileLabel" class="text-sm text-slate-600">
+              トレーニング完了後に テストセット (CSV) をアップロード
+            </div>
+          </div>
+        </div>
+
+        <button id="predictBtn" disabled class="w-full py-3 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition bg-teal-300 cursor-not-allowed">
+          テストセットに対して予測を実行
+        </button>
+
+        <!-- Test Accuracy -->
+        <div id="testAccResult" class="hidden bg-teal-50 border border-teal-200 p-4 rounded-lg mt-4">
+          <h4 class="font-bold text-teal-800 flex items-center gap-2"><i class="fa-solid fa-chart-pie"></i> テストセット評価結果</h4>
+          <p class="text-teal-700 mt-2 text-sm">
+            テストセット精度 (Accuracy): <b class="text-lg" id="testAccSpan"></b>
+          </p>
+        </div>
+
+        <!-- Predictions Table -->
+        <div id="predictionsWrapper" class="hidden mt-4 flex-1 border border-slate-200 rounded-lg overflow-hidden flex flex-col">
+          <div class="bg-slate-50 p-3 border-b flex justify-between items-center">
+            <h3 class="font-medium text-sm text-slate-700">予測結果のプレビュー (Top 5)</h3>
+            <button id="downloadBtn" class="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium bg-blue-100 py-1 px-2 rounded">
+              <i class="fa-solid fa-download"></i> 結果CSVをエクスポート
+            </button>
+          </div>
+          <div class="overflow-x-auto flex-1">
+            <table class="w-full text-sm text-left text-slate-600">
+              <thead class="text-xs text-slate-500 uppercase bg-slate-50" id="tableHead">
+                <!-- Injected via JS -->
+              </thead>
+              <tbody id="tableBody">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+            <div id="tableFooter" class="hidden p-2 text-center text-xs text-slate-400 bg-slate-50 border-t">
+              ... 残りの行は非表示です。エクスポートして全体を確認してください。
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ----------------------
+    // 1. 簡易 CSV パーサー
+    // ----------------------
+    const customCsvParse = (text) => {
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+      if (lines.length === 0) return { data: [] };
+      const headers = lines[0].split(',').map(h => h.trim());
+      const data = lines.slice(1).map(line => {
+        const values = line.split(',');
+        const rowObj = {};
+        headers.forEach((h, idx) => rowObj[h] = (values[idx] || '').trim());
+        return rowObj;
+      });
+      return { data };
+    };
+
+    const customCsvUnparse = (data) => {
+      if (!data || !data.length) return '';
+      const headers = Object.keys(data[0]);
+      let csv = headers.join(',') + '\n';
+      data.forEach(row => {
+        csv += headers.map(h => row[h]).join(',') + '\n';
+      });
+      return csv;
+    };
+
+    // ----------------------
+    // 2. 機械学習アルゴリズムの実装
+    // ----------------------
+
+    class RandomForest {
+      constructor({ nEstimators = 20, maxDepth = 10 } = {}) {
+        this.nEstimators = nEstimators;
+        this.maxDepth = maxDepth;
+        this.trees = [];
+      }
+      fit(X, y) {
+        this.trees = [];
+        for (let i = 0; i < this.nEstimators; i++) {
+          const { sampleX, sampleY } = this.bootstrap(X, y);
+          const tree = this.buildTree(sampleX, sampleY, 0);
+          this.trees.push(tree);
+        }
+      }
+      bootstrap(X, y) {
+        const sampleX = [], sampleY = [];
+        for (let i = 0; i < X.length; i++) {
+          const idx = Math.floor(Math.random() * X.length);
+          sampleX.push(X[idx]);
+          sampleY.push(y[idx]);
+        }
+        return { sampleX, sampleY };
+      }
+      buildTree(X, y, depth) {
+        const uniqueY = [...new Set(y)];
+        if (depth >= this.maxDepth || uniqueY.length === 1 || X.length < 2) {
+          return { type: 'leaf', value: this.majority(y) };
+        }
+        let bestSplit = null;
+        let bestGini = Infinity;
+        const numFeatures = X[0].length;
+        const features = [];
+        while(features.length < Math.max(1, Math.floor(Math.sqrt(numFeatures)))) {
+          const f = Math.floor(Math.random() * numFeatures);
+          if(!features.includes(f)) features.push(f);
+        }
+        features.forEach(fIdx => {
+          const values = [...new Set(X.map(row => row[fIdx]))].sort((a,b)=>a-b);
+          for (let i = 0; i < Math.min(values.length - 1, 10); i++) { 
+            const threshold = (values[i] + values[i+1]) / 2;
+            const leftY = [], rightY = [];
+            for (let j = 0; j < X.length; j++) {
+              if (X[j][fIdx] <= threshold) leftY.push(y[j]);
+              else rightY.push(y[j]);
+            }
+            if (leftY.length === 0 || rightY.length === 0) continue;
+            const gini = (leftY.length * this.giniImpurity(leftY) + rightY.length * this.giniImpurity(rightY)) / y.length;
+            if (gini < bestGini) {
+              bestGini = gini;
+              bestSplit = { fIdx, threshold, leftX: [], leftY: [], rightX: [], rightY: [] };
+            }
+          }
+        });
+        if (!bestSplit) return { type: 'leaf', value: this.majority(y) };
+        for (let j = 0; j < X.length; j++) {
+          if (X[j][bestSplit.fIdx] <= bestSplit.threshold) {
+            bestSplit.leftX.push(X[j]); bestSplit.leftY.push(y[j]);
+          } else {
+            bestSplit.rightX.push(X[j]); bestSplit.rightY.push(y[j]);
+          }
+        }
+        return {
+          type: 'node', fIdx: bestSplit.fIdx, threshold: bestSplit.threshold,
+          left: this.buildTree(bestSplit.leftX, bestSplit.leftY, depth + 1),
+          right: this.buildTree(bestSplit.rightX, bestSplit.rightY, depth + 1)
+        };
+      }
+      giniImpurity(y) {
+        const counts = {};
+        y.forEach(v => counts[v] = (counts[v] || 0) + 1);
+        let impurity = 1;
+        for (let v in counts) impurity -= Math.pow(counts[v] / y.length, 2);
+        return impurity;
+      }
+      majority(y) {
+        const counts = {};
+        let max = 0, res = y[0];
+        y.forEach(v => {
+          counts[v] = (counts[v] || 0) + 1;
+          if (counts[v] > max) { max = counts[v]; res = v; }
+        });
+        return res;
+      }
+      predict(X) {
+        return X.map(row => {
+          const preds = this.trees.map(tree => this.predictRow(row, tree));
+          return this.majority(preds);
+        });
+      }
+      predictRow(row, tree) {
+        if (tree.type === 'leaf') return tree.value;
+        if (row[tree.fIdx] <= tree.threshold) return this.predictRow(row, tree.left);
+        return this.predictRow(row, tree.right);
+      }
+    }
+
+    class MultiClassSVM {
+      constructor({ epochs = 100, lr = 0.05, lambda = 0.01 } = {}) {
+        this.epochs = epochs; this.lr = lr; this.lambda = lambda;
+        this.models = []; this.classes = [];
+      }
+      dot(a, b) { return a.reduce((sum, val, i) => sum + val * b[i], 0); }
+      fit(X, y) {
+        this.classes = [...new Set(y)].sort((a,b)=>a-b);
+        this.models = this.classes.map(c => {
+          const binY = y.map(lbl => lbl === c ? 1 : -1);
+          let w = new Array(X[0].length).fill(0);
+          let b = 0;
+          for(let e=0; e < this.epochs; e++) {
+            for(let i=0; i < X.length; i++) {
+              const margin = binY[i] * (this.dot(w, X[i]) + b);
+              if (margin < 1) {
+                for(let j=0; j < w.length; j++) w[j] -= this.lr * (2 * this.lambda * w[j] - binY[i] * X[i][j]);
+                b += this.lr * binY[i];
+              } else {
+                for(let j=0; j < w.length; j++) w[j] -= this.lr * (2 * this.lambda * w[j]);
+              }
+            }
+          }
+          return {w, b};
+        });
+      }
+      predict(X) {
+        return X.map(x => {
+          let maxScore = -Infinity; let bestClass = this.classes[0];
+          this.models.forEach((model, idx) => {
+            const score = this.dot(model.w, x) + model.b;
+            if (score > maxScore) { maxScore = score; bestClass = this.classes[idx]; }
+          });
+          return bestClass;
+        });
+      }
+    }
+
+    class MLP {
+      constructor({ hiddenNodes = 16, epochs = 10, lr = 0.05 } = {}) {
+        this.hiddenNodes = hiddenNodes; this.epochs = epochs; this.lr = lr;
+      }
+      initWeights(inSize, outSize) {
+        return Array.from({length: inSize}, () => Array.from({length: outSize}, () => (Math.random() - 0.5) * 0.1));
+      }
+      fit(X, y) {
+        const inSize = X[0].length;
+        this.classes = [...new Set(y)].sort((a,b)=>a-b);
+        const outSize = this.classes.length;
+        this.W1 = this.initWeights(inSize, this.hiddenNodes);
+        this.b1 = new Array(this.hiddenNodes).fill(0);
+        this.W2 = this.initWeights(this.hiddenNodes, outSize);
+        this.b2 = new Array(outSize).fill(0);
+
+        for(let e=0; e < this.epochs; e++) {
+          for(let i=0; i < X.length; i++) {
+            const x = X[i];
+            const targetIdx = this.classes.indexOf(y[i]);
+            const y_onehot = new Array(outSize).fill(0);
+            y_onehot[targetIdx] = 1;
+
+            const z1 = new Array(this.hiddenNodes).fill(0);
+            const a1 = new Array(this.hiddenNodes).fill(0);
+            for(let h=0; h<this.hiddenNodes; h++) {
+              let sum = this.b1[h];
+              for(let d=0; d<inSize; d++) sum += x[d] * this.W1[d][h];
+              z1[h] = sum;
+              a1[h] = Math.max(0, sum);
+            }
+
+            const z2 = new Array(outSize).fill(0);
+            let maxZ2 = -Infinity;
+            for(let o=0; o<outSize; o++) {
+              let sum = this.b2[o];
+              for(let h=0; h<this.hiddenNodes; h++) sum += a1[h] * this.W2[h][o];
+              z2[o] = sum;
+              if (sum > maxZ2) maxZ2 = sum;
+            }
+
+            const expZ2 = z2.map(val => Math.exp(val - maxZ2));
+            const sumExpZ2 = expZ2.reduce((a,b)=>a+b, 0);
+            const a2 = expZ2.map(val => val / sumExpZ2);
+
+            const dz2 = a2.map((val, idx) => val - y_onehot[idx]);
+            const da1 = new Array(this.hiddenNodes).fill(0);
+            const dz1 = new Array(this.hiddenNodes).fill(0);
+            
+            for(let h=0; h<this.hiddenNodes; h++) {
+              let sum = 0;
+              for(let o=0; o<outSize; o++) {
+                sum += dz2[o] * this.W2[h][o];
+                this.W2[h][o] -= this.lr * dz2[o] * a1[h];
+              }
+              da1[h] = sum;
+              dz1[h] = z1[h] > 0 ? da1[h] : 0;
+              for(let d=0; d<inSize; d++) this.W1[d][h] -= this.lr * dz1[h] * x[d];
+              this.b1[h] -= this.lr * dz1[h];
+            }
+            for(let o=0; o<outSize; o++) this.b2[o] -= this.lr * dz2[o];
+          }
+        }
+      }
+      predict(X) {
+        return X.map(x => {
+          const a1 = new Array(this.hiddenNodes).fill(0);
+          for(let h=0; h<this.hiddenNodes; h++) {
+            let sum = this.b1[h];
+            for(let d=0; d<x.length; d++) sum += x[d] * this.W1[d][h];
+            a1[h] = Math.max(0, sum);
+          }
+          let bestClassIdx = 0; let maxZ2 = -Infinity;
+          for(let o=0; o<this.classes.length; o++) {
+            let sum = this.b2[o];
+            for(let h=0; h<this.hiddenNodes; h++) sum += a1[h] * this.W2[h][o];
+            if (sum > maxZ2) { maxZ2 = sum; bestClassIdx = o; }
+          }
+          return this.classes[bestClassIdx];
+        });
+      }
+    }
+
+    // ----------------------
+    // 3. Application Logic
+    // ----------------------
+    let state = {
+      trainData: [], featureCols: [], textCol: '', targetCol: '',
+      testData: [], model: null, predictions: [],
+      classifierType: 'RandomForest'
+    };
+
+    // DOM Elements
+    const el = (id) => document.getElementById(id);
+    const showError = (msg) => {
+      if(msg) { el('errorMessage').innerText = msg; el('errorAlert').classList.remove('hidden'); }
+      else { el('errorAlert').classList.add('hidden'); }
+    };
+
+    const updateBtnState = (btnId, active, baseClass, activeClass, inactiveClass) => {
+      const btn = el(btnId);
+      btn.disabled = !active;
+      if (active) {
+        btn.className = `${baseClass} ${activeClass} cursor-pointer shadow-sm`;
+      } else {
+        btn.className = `${baseClass} ${inactiveClass} cursor-not-allowed`;
+      }
+    };
+
+    const calculateAccuracy = (yTrue, yPred) => {
+      let correct = 0;
+      for (let i = 0; i < yTrue.length; i++) {
+        if (String(yTrue[i]) === String(yPred[i])) correct++;
+      }
+      return ((correct / yTrue.length) * 100).toFixed(2);
+    };
+
+    // UI Listeners
+    el('algoSelect').addEventListener('change', (e) => {
+      state.classifierType = e.target.value;
+      state.model = null;
+      el('trainResult').classList.add('hidden');
+      el('testAccResult').classList.add('hidden');
+      el('predictionsWrapper').classList.add('hidden');
+      
+      if (state.classifierType === 'MLP') {
+        el('mlpConfig').classList.remove('hidden');
+        el('mlpConfig').classList.add('grid');
+      } else {
+        el('mlpConfig').classList.add('hidden');
+        el('mlpConfig').classList.remove('grid');
+      }
+      checkTestUploadReady();
+    });
+
+    el('trainFileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      showError('');
+      state.model = null; state.predictions = [];
+      el('trainResult').classList.add('hidden');
+      el('testAccResult').classList.add('hidden');
+      el('predictionsWrapper').classList.add('hidden');
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const results = customCsvParse(event.target.result);
+          if (results.data && results.data.length > 0) {
+            const cols = Object.keys(results.data[0]);
+            if(cols.length < 3) {
+              showError('CSVの形式エラー：少なくとも3列（1列の説明＋1列以上の特徴量＋1列のラベル）が必要です。');
+              return;
+            }
+            state.textCol = cols[0];
+            state.featureCols = cols.slice(1, cols.length - 1);
+            state.targetCol = cols[cols.length - 1];
+            state.trainData = results.data;
+            
+            el('trainFileLabel').innerHTML = `<span class="text-blue-600 font-medium">${file.name} (${state.trainData.length} 行のデータ)</span>`;
+            
+            el('infoTextCol').innerText = state.textCol;
+            el('infoFeatureCount').innerText = state.featureCols.length;
+            el('infoFeatureCols').innerText = state.featureCols.join(', ');
+            el('infoTargetCol').innerText = state.targetCol;
+            el('dataInfoDisplay').classList.remove('hidden');
+            
+            updateBtnState('trainBtn', true, 'w-full mt-auto py-3 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition', 'bg-blue-600 hover:bg-blue-700', 'bg-blue-300');
+            checkTestUploadReady();
+          } else {
+            showError('トレーニングデータが空であるか、解析できません。');
+          }
+        } catch (err) {
+          showError(`CSVの解析に失敗しました: ${err.message}`);
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    el('trainBtn').addEventListener('click', () => {
+      showError('');
+      const btn = el('trainBtn');
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> モデルのトレーニング中...`;
+      btn.disabled = true;
+
+      setTimeout(() => {
+        try {
+          const startTime = performance.now();
+          const X = state.trainData.map(row => state.featureCols.map(col => Number(row[col]) || 0));
+          const y = state.trainData.map(row => Number(row[state.targetCol]));
+
+          let classifier;
+          if (state.classifierType === 'RandomForest') {
+            classifier = new RandomForest({ nEstimators: 20, maxDepth: 10 });
+          } else if (state.classifierType === 'SVM') {
+            classifier = new MultiClassSVM({ epochs: 100, lr: 0.05 });
+          } else if (state.classifierType === 'MLP') {
+            const nodes = Number(el('mlpNodes').value) || 16;
+            const epochs = Number(el('mlpEpochs').value) || 10;
+            classifier = new MLP({ hiddenNodes: nodes, epochs: epochs, lr: 0.05 });
+          }
+
+          classifier.fit(X, y);
+          state.model = classifier;
+          
+          const yPred = classifier.predict(X);
+          const acc = calculateAccuracy(y, yPred);
+          
+          const endTime = performance.now();
+          el('trainTimeSpan').innerText = ((endTime - startTime) / 1000).toFixed(2) + 's';
+          el('trainAccSpan').innerText = acc + '%';
+          el('trainResult').classList.remove('hidden');
+          
+          checkTestUploadReady();
+        } catch (err) {
+          showError(`トレーニングに失敗しました: ${err.message}`);
+        } finally {
+          btn.innerHTML = `<i class="fa-solid fa-play"></i> トレーニング開始`;
+          btn.disabled = false;
+        }
+      }, 50);
+    });
+
+    const checkTestUploadReady = () => {
+      const input = el('testFileInput');
+      const wrapper = el('testUploadWrapper');
+      if (state.model) {
+        input.disabled = false;
+        input.classList.replace('cursor-not-allowed', 'cursor-pointer');
+        wrapper.classList.remove('opacity-50', 'pointer-events-none');
+        
+        // 追加: もし既にテストデータが存在していれば、予測ボタンを即座に有効化する
+        if (state.testData && state.testData.length > 0) {
+          updateBtnState('predictBtn', true, 'w-full py-3 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition', 'bg-teal-600 hover:bg-teal-700', 'bg-teal-300');
+        }
+      } else {
+        input.disabled = true;
+        input.classList.replace('cursor-pointer', 'cursor-not-allowed');
+        wrapper.classList.add('opacity-50', 'pointer-events-none');
+        updateBtnState('predictBtn', false, 'w-full py-3 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition', 'bg-teal-600 hover:bg-teal-700', 'bg-teal-300');
+      }
+    };
+
+    el('testFileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      showError('');
+      state.predictions = [];
+      el('testAccResult').classList.add('hidden');
+      el('predictionsWrapper').classList.add('hidden');
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const results = customCsvParse(event.target.result);
+          if (results.data && results.data.length > 0) {
+            state.testData = results.data;
+            el('testFileLabel').innerHTML = `<span class="text-blue-600 font-medium">${file.name} (${state.testData.length} 行のデータ)</span>`;
+            updateBtnState('predictBtn', true, 'w-full py-3 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition', 'bg-teal-600 hover:bg-teal-700', 'bg-teal-300');
+          } else {
+            showError('テストデータが空です。');
+          }
+        } catch (err) {
+          showError(`CSVの解析に失敗しました: ${err.message}`);
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    el('predictBtn').addEventListener('click', () => {
+      if (!state.model || !state.testData.length) return;
+      showError('');
+      const btn = el('predictBtn');
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 予測計算中...`;
+      btn.disabled = true;
+
+      setTimeout(() => {
+        try {
+          const X_test = state.testData.map(row => state.featureCols.map(col => Number(row[col]) || 0));
+          const yPred = state.model.predict(X_test);
+          state.predictions = yPred;
+
+          let hasAccuracy = false;
+          if (state.testData[0][state.targetCol] !== undefined) {
+            const yTrue = state.testData.map(row => Number(row[state.targetCol]));
+            const acc = calculateAccuracy(yTrue, yPred);
+            el('testAccSpan').innerText = acc + '%';
+            el('testAccResult').classList.remove('hidden');
+            hasAccuracy = true;
+          }
+
+          renderPredictionsTable(hasAccuracy);
+          el('predictionsWrapper').classList.remove('hidden');
+          el('predictionsWrapper').classList.add('flex');
+        } catch(err) {
+          showError(`予測に失敗しました: ${err.message}`);
+        } finally {
+          btn.innerHTML = `テストセットに対して予測を実行`;
+          btn.disabled = false;
+        }
+      }, 50);
+    });
+
+    const renderPredictionsTable = (hasAccuracy) => {
+      const head = el('tableHead');
+      const body = el('tableBody');
+      const cols = Object.keys(state.testData[0]);
+      
+      let headHTML = '<tr>';
+      cols.forEach(c => headHTML += `<th class="px-4 py-2 border-b whitespace-nowrap">${c}</th>`);
+      headHTML += `<th class="px-4 py-2 border-b font-bold text-blue-700 whitespace-nowrap">モデル予測</th></tr>`;
+      head.innerHTML = headHTML;
+
+      let bodyHTML = '';
+      state.testData.slice(0, 5).forEach((row, idx) => {
+        let isIncorrect = hasAccuracy && String(row[state.targetCol]) !== String(state.predictions[idx]);
+        bodyHTML += `<tr class="border-b last:border-0 hover:bg-slate-50">`;
+        cols.forEach(c => {
+          bodyHTML += `<td class="px-4 py-2 truncate max-w-[150px]" title="${row[c]}">${row[c]}</td>`;
+        });
+        bodyHTML += `<td class="px-4 py-2 font-bold ${isIncorrect ? 'text-red-500' : 'text-blue-600'}">${state.predictions[idx]}</td></tr>`;
+      });
+      body.innerHTML = bodyHTML;
+
+      if (state.testData.length > 5) {
+        el('tableFooter').classList.remove('hidden');
+        el('tableFooter').innerText = `... 残りの ${state.testData.length - 5} 行は非表示です。エクスポートして全体を確認してください。`;
+      } else {
+        el('tableFooter').classList.add('hidden');
+      }
+    };
+
+    el('downloadBtn').addEventListener('click', () => {
+      if (!state.predictions.length) return;
+      const resultsData = state.testData.map((row, index) => ({
+        ...row,
+        [`Predicted_Label`]: state.predictions[index]
+      }));
+      const csv = customCsvUnparse(resultsData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `${state.classifierType}_predictions.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  </script>
+</body>
+</html>
